@@ -1,39 +1,60 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Tabs,
-  Card,
-  Text,
-  Title,
-  Group,
-  Badge,
-  Button,
-  Stack,
-  Progress,
-  Avatar,
-  Select,
-  TextInput,
-  Table,
-  ActionIcon,
-  Paper,
-  Tooltip,
-  Modal,
-  ScrollArea,
-  Box,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+  Plus,
+  Search,
+  LayoutGrid,
+  List,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  GripVertical,
+  Loader2,
+  X,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  IconPlus,
-  IconSearch,
-  IconLayoutKanban,
-  IconList,
-  IconPencil,
-  IconTrash,
-  IconAlertTriangle,
-  IconGripVertical,
-} from '@tabler/icons-react';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { showNotification } from '@/lib/notify.js';
+import { getBadgeStyle, getColorClasses, getProgressStyle } from '@/lib/colors';
+import { cn } from '@/lib/utils';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { PageHeader } from '@/components/ui/typography';
 import { TaskModal } from '../components/TaskModal';
 import { TaskDetailView } from './TaskDetailView';
 
@@ -52,7 +73,7 @@ function sortTasksByOrder(a, b) {
   return (a.createdAt || '').localeCompare(b.createdAt || '');
 }
 
-export function TasksView({ initialTaskId }) {
+export function TasksView({ initialTaskId, projectId }) {
   const { user } = useAuth();
   const { tasks, projects, users, refresh } = useData();
 
@@ -61,10 +82,15 @@ export function TasksView({ initialTaskId }) {
   useEffect(() => {
     if (initialTaskId) setActiveTaskId(initialTaskId);
   }, [initialTaskId]);
+
   const [search, setSearch] = useState('');
-  const [filterProject, setFilterProject] = useState(null);
+  const [filterProject, setFilterProject] = useState(projectId || null);
   const [filterAssignee, setFilterAssignee] = useState(null);
-  
+
+  useEffect(() => {
+    if (projectId) setFilterProject(projectId);
+  }, [projectId]);
+
   const [createModalOpened, setCreateModalOpened] = useState(false);
   const [editTaskId, setEditTaskId] = useState(null);
   const [editModalOpened, setEditModalOpened] = useState(false);
@@ -73,7 +99,6 @@ export function TasksView({ initialTaskId }) {
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Drag and Drop States
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverTaskId, setDragOverTaskId] = useState(null);
   const [dragOverColumnId, setDragOverColumnId] = useState(null);
@@ -81,96 +106,93 @@ export function TasksView({ initialTaskId }) {
   const didDragRef = useRef(false);
   const suppressClickRef = useRef(false);
 
-  const handleTaskDrop = useCallback(async (targetColumnId, targetTaskId = null, event = null) => {
-    const taskId = event?.dataTransfer?.getData('text/plain') || draggedTaskIdRef.current || draggedTaskId;
-    if (!taskId) return;
+  const handleTaskDrop = useCallback(
+    async (targetColumnId, targetTaskId = null, event = null) => {
+      const taskId = event?.dataTransfer?.getData('text/plain') || draggedTaskIdRef.current || draggedTaskId;
+      if (!taskId) return;
 
-    const taskToMove = tasks.find((t) => t.id === taskId);
-    if (!taskToMove) return;
+      const taskToMove = tasks.find((t) => t.id === taskId);
+      if (!taskToMove) return;
 
-    const sourceColumnId = taskToMove.status;
-    const isSameColumn = sourceColumnId === targetColumnId;
+      const sourceColumnId = taskToMove.status;
+      const isSameColumn = sourceColumnId === targetColumnId;
 
-    try {
-      const colTitle = COLUMNS.find((c) => c.id === targetColumnId)?.title || targetColumnId;
+      try {
+        const colTitle = COLUMNS.find((c) => c.id === targetColumnId)?.title || targetColumnId;
 
-      const sourceColTasks = tasks
-        .filter((t) => t.status === sourceColumnId)
-        .sort(sortTasksByOrder);
+        const sourceColTasks = tasks.filter((t) => t.status === sourceColumnId).sort(sortTasksByOrder);
 
-      let targetColTasks = tasks
-        .filter((t) => t.status === targetColumnId && t.id !== taskId)
-        .sort(sortTasksByOrder);
+        let targetColTasks = tasks
+          .filter((t) => t.status === targetColumnId && t.id !== taskId)
+          .sort(sortTasksByOrder);
 
-      const updatedTask = { ...taskToMove, status: targetColumnId };
+        const updatedTask = { ...taskToMove, status: targetColumnId };
 
-      if (targetTaskId && targetTaskId !== taskId) {
-        const targetIndex = targetColTasks.findIndex((t) => t.id === targetTaskId);
-        if (targetIndex >= 0) {
-          if (isSameColumn) {
-            const sourceIndex = sourceColTasks.findIndex((t) => t.id === taskId);
-            const rawTargetIndex = sourceColTasks.findIndex((t) => t.id === targetTaskId);
-            const insertIndex = sourceIndex < rawTargetIndex ? targetIndex + 1 : targetIndex;
-            targetColTasks.splice(insertIndex, 0, updatedTask);
+        if (targetTaskId && targetTaskId !== taskId) {
+          const targetIndex = targetColTasks.findIndex((t) => t.id === targetTaskId);
+          if (targetIndex >= 0) {
+            if (isSameColumn) {
+              const sourceIndex = sourceColTasks.findIndex((t) => t.id === taskId);
+              const rawTargetIndex = sourceColTasks.findIndex((t) => t.id === targetTaskId);
+              const insertIndex = sourceIndex < rawTargetIndex ? targetIndex + 1 : targetIndex;
+              targetColTasks.splice(insertIndex, 0, updatedTask);
+            } else {
+              targetColTasks.splice(targetIndex, 0, updatedTask);
+            }
           } else {
-            targetColTasks.splice(targetIndex, 0, updatedTask);
+            targetColTasks.push(updatedTask);
           }
         } else {
           targetColTasks.push(updatedTask);
         }
-      } else {
-        targetColTasks.push(updatedTask);
+
+        const reorderPayload = targetColTasks.map((t, idx) => ({
+          id: t.id,
+          status: targetColumnId,
+          order: idx,
+        }));
+
+        if (!isSameColumn) {
+          tasks
+            .filter((t) => t.status === sourceColumnId && t.id !== taskId)
+            .sort(sortTasksByOrder)
+            .forEach((t, idx) => {
+              reorderPayload.push({ id: t.id, status: sourceColumnId, order: idx });
+            });
+        }
+
+        await api.reorderTasks(reorderPayload);
+
+        showNotification({
+          title: isSameColumn ? 'Task Reordered' : 'Task Moved',
+          message:
+            isSameColumn && targetTaskId
+              ? `"${taskToMove.title}" reordered in ${colTitle}`
+              : `"${taskToMove.title}" moved to ${colTitle}`,
+          color: 'green',
+        });
+
+        refresh();
+      } catch (err) {
+        showNotification({ title: 'Error', message: err.message, color: 'red' });
+      } finally {
+        draggedTaskIdRef.current = null;
+        setDraggedTaskId(null);
+        setDragOverTaskId(null);
+        setDragOverColumnId(null);
       }
+    },
+    [tasks, draggedTaskId, refresh]
+  );
 
-      const reorderPayload = targetColTasks.map((t, idx) => ({
-        id: t.id,
-        status: targetColumnId,
-        order: idx,
-      }));
-
-      if (!isSameColumn) {
-        tasks
-          .filter((t) => t.status === sourceColumnId && t.id !== taskId)
-          .sort(sortTasksByOrder)
-          .forEach((t, idx) => {
-            reorderPayload.push({ id: t.id, status: sourceColumnId, order: idx });
-          });
-      }
-
-      await api.reorderTasks(reorderPayload);
-
-      notifications.show({
-        title: isSameColumn ? 'Task Reordered' : 'Task Moved',
-        message: isSameColumn && targetTaskId
-          ? `"${taskToMove.title}" reordered in ${colTitle}`
-          : `"${taskToMove.title}" moved to ${colTitle}`,
-        color: 'green',
-      });
-
-      refresh();
-    } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
-    } finally {
-      draggedTaskIdRef.current = null;
-      setDraggedTaskId(null);
-      setDragOverTaskId(null);
-      setDragOverColumnId(null);
-    }
-  }, [tasks, draggedTaskId, refresh]);
-
-  // If a task is selected, show the full task details view
   if (activeTaskId) {
-    return (
-      <TaskDetailView
-        taskId={activeTaskId}
-        onBack={() => setActiveTaskId(null)}
-      />
-    );
+    return <TaskDetailView taskId={activeTaskId} onBack={() => setActiveTaskId(null)} />;
   }
 
   const filteredTasks = tasks.filter((t) => {
     if (filterProject && t.projectId !== filterProject) return false;
-    if (filterAssignee && t.assigneeId !== filterAssignee && !(t.assigneeIds || []).includes(filterAssignee)) return false;
+    if (filterAssignee && t.assigneeId !== filterAssignee && !(t.assigneeIds || []).includes(filterAssignee))
+      return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       return (
@@ -182,9 +204,7 @@ export function TasksView({ initialTaskId }) {
     return true;
   });
 
-  const handleOpenCreate = () => {
-    setCreateModalOpened(true);
-  };
+  const handleOpenCreate = () => setCreateModalOpened(true);
 
   const handleOpenEdit = (e, id) => {
     e.stopPropagation();
@@ -203,388 +223,441 @@ export function TasksView({ initialTaskId }) {
     try {
       setDeleting(true);
       await api.deleteTask(taskToDelete.id);
-      notifications.show({ title: 'Moved to Recycle Bin', message: `"${taskToDelete.title}" was moved to the Recycle Bin.`, color: 'blue' });
+      showNotification({
+        title: 'Moved to Recycle Bin',
+        message: `"${taskToDelete.title}" was moved to the Recycle Bin.`,
+        color: 'blue',
+      });
       setDeleteModalOpened(false);
       setTaskToDelete(null);
       refresh();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setDeleting(false);
     }
   };
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   return (
-    <Stack gap="md" style={{ height: 'calc(100vh - 125px)', minHeight: 480 }}>
-      {/* Header Bar */}
-      <Group justify="space-between" style={{ flexShrink: 0 }}>
-        <div>
-          <Title order={2}>Tasks</Title>
-          <Text c="dimmed" size="sm">Track progress, assign tasks, and drag cards to reorder or change status</Text>
+    <TooltipProvider>
+      <div className="flex min-h-[480px] flex-col gap-4" style={{ height: 'calc(100vh - 125px)' }}>
+        <PageHeader
+          title="Tasks"
+          description="Track progress, assign tasks, and drag cards to reorder or change status"
+        >
+          {user?.role !== 'viewer' && (
+            <Button onClick={handleOpenCreate}>
+              <Plus className="h-4 w-4" />
+              New Task
+            </Button>
+          )}
+        </PageHeader>
+
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="relative w-[240px]">
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search tasks..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+
+          {!projectId && (
+          <div className="flex items-center gap-1">
+            <Select
+              value={filterProject ?? undefined}
+              onValueChange={setFilterProject}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by Project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {filterProject && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFilterProject(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          )}
+
+          <div className="flex items-center gap-1">
+            <Select
+              value={filterAssignee ?? undefined}
+              onValueChange={setFilterAssignee}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by Person" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {filterAssignee && (
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFilterAssignee(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
-        {user?.role !== 'viewer' && (
-          <Button leftSection={<IconPlus size={16} />} color="blue" onClick={handleOpenCreate}>
-            New Task
-          </Button>
-        )}
-      </Group>
 
-      {/* Filter Controls */}
-      <Group justify="space-between" style={{ flexShrink: 0 }}>
-        <Group gap="sm">
-          <TextInput
-            placeholder="Search tasks..."
-            leftSection={<IconSearch size={16} />}
-            value={search}
-            onChange={(e) => setSearch(e.currentTarget.value)}
-            style={{ width: 240 }}
-          />
-          <Select
-            placeholder="Filter by Project"
-            data={projects.map((p) => ({ value: p.id, label: p.name }))}
-            value={filterProject}
-            onChange={setFilterProject}
-            clearable
-            style={{ width: 200 }}
-          />
-          <Select
-            placeholder="Filter by Person"
-            data={users.map((u) => ({ value: u.id, label: u.name }))}
-            value={filterAssignee}
-            onChange={setFilterAssignee}
-            clearable
-            style={{ width: 200 }}
-          />
-        </Group>
-      </Group>
+        <Tabs defaultValue="kanban" className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="mb-2 shrink-0">
+            <TabsTrigger value="kanban">
+              <LayoutGrid className="h-4 w-4" />
+              Board View
+            </TabsTrigger>
+            <TabsTrigger value="list">
+              <List className="h-4 w-4" />
+              List View
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Main Tabs Container */}
-      <Tabs defaultValue="kanban" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <Tabs.List mb="sm" style={{ flexShrink: 0 }}>
-          <Tabs.Tab value="kanban" leftSection={<IconLayoutKanban size={16} />}>
-            Board View
-          </Tabs.Tab>
-          <Tabs.Tab value="list" leftSection={<IconList size={16} />}>
-            List View
-          </Tabs.Tab>
-        </Tabs.List>
+          <TabsContent value="kanban" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+            <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-1.5">
+              {COLUMNS.map((col) => {
+                const colTasks = filteredTasks.filter((t) => t.status === col.id).sort(sortTasksByOrder);
+                const isColumnHovered = dragOverColumnId === col.id;
 
-        {/* Board View Panel */}
-        <Tabs.Panel value="kanban" style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-          <Box style={{ flex: 1, display: 'flex', gap: 16, overflowX: 'auto', alignItems: 'stretch', minHeight: 0, paddingBottom: 6 }}>
-            {COLUMNS.map((col) => {
-              const colTasks = filteredTasks
-                .filter((t) => t.status === col.id)
-                .sort(sortTasksByOrder);
+                return (
+                  <div
+                    key={col.id}
+                    className={cn(
+                      'flex min-h-0 w-full min-w-[260px] max-w-[320px] flex-1 flex-col rounded-lg border p-3 transition-all',
+                      isColumnHovered ? 'border-dashed border-primary bg-[#1a2234] outline outline-2 outline-primary' : 'bg-[#141517]'
+                    )}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDragOverColumnId(col.id);
+                    }}
+                    onDragLeave={(e) => {
+                      if (e.currentTarget.contains(e.relatedTarget)) return;
+                      setDragOverColumnId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleTaskDrop(col.id, null, e);
+                    }}
+                  >
+                    <div className="mb-2 flex shrink-0 items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          className={cn('border-transparent text-white', getColorClasses(col.color, 'badge'))}
+                        >
+                          {col.title}
+                        </Badge>
+                        <Badge variant="secondary">{colTasks.length}</Badge>
+                      </div>
+                    </div>
 
-              const isColumnHovered = dragOverColumnId === col.id;
+                    <ScrollArea className="flex-1">
+                      <div
+                        className="flex min-h-[120px] flex-1 flex-col gap-2 pr-2"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.dataTransfer.dropEffect = 'move';
+                          setDragOverColumnId(col.id);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleTaskDrop(col.id, null, e);
+                        }}
+                      >
+                        {colTasks.length === 0 ? (
+                          <p className="py-8 text-center text-xs italic text-muted-foreground">Drop tasks here</p>
+                        ) : (
+                          colTasks.map((task) => {
+                            const project = projects.find((p) => p.id === task.projectId);
+                            const assignee = users.find((u) => u.id === task.assigneeId);
+                            const isDraggingThis = draggedTaskId === task.id;
+                            const isDragOverThis = dragOverTaskId === task.id;
 
-              return (
-                <Paper
-                  key={col.id}
-                  p="sm"
-                  radius="md"
-                  withBorder
-                  style={{
-                    flex: '1 0 260px',
-                    minWidth: 260,
-                    maxWidth: 320,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    backgroundColor: isColumnHovered ? '#1a2234' : '#141517',
-                    outline: isColumnHovered ? '2px dashed #3b82f6' : 'none',
-                    minHeight: 0,
-                    transition: 'background-color 0.15s ease, outline 0.15s ease',
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    setDragOverColumnId(col.id);
-                  }}
-                  onDragLeave={(e) => {
-                    if (e.currentTarget.contains(e.relatedTarget)) return;
-                    setDragOverColumnId(null);
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleTaskDrop(col.id, null, e);
-                  }}
-                >
-                  {/* Column Header */}
-                  <Group justify="space-between" mb="sm" style={{ flexShrink: 0 }}>
-                    <Group gap="xs">
-                      <Badge color={col.color} variant="dot">
-                        {col.title}
-                      </Badge>
-                      <Badge color="gray" variant="filled" size="xs">
-                        {colTasks.length}
-                      </Badge>
-                    </Group>
-                  </Group>
-
-                  {/* Scrollable Cards Container */}
-                  <ScrollArea style={{ flex: 1 }} offsetScrollbars scrollbars="y">
-                    <Stack
-                      gap="xs"
-                      pr={4}
-                      style={{ minHeight: 120, flex: 1 }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        e.dataTransfer.dropEffect = 'move';
-                        setDragOverColumnId(col.id);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleTaskDrop(col.id, null, e);
-                      }}
-                    >
-                      {colTasks.length === 0 ? (
-                        <Text size="xs" c="dimmed" fs="italic" py="lg" ta="center">
-                          Drop tasks here
-                        </Text>
-                      ) : (
-                        colTasks.map((task) => {
-                          const project = projects.find((p) => p.id === task.projectId);
-                          const assignee = users.find((u) => u.id === task.assigneeId);
-                          const isDraggingThis = draggedTaskId === task.id;
-                          const isDragOverThis = dragOverTaskId === task.id;
-
-                          return (
-                            <Card
-                              key={task.id}
-                              withBorder
-                              shadow="xs"
-                              p="sm"
-                              radius="sm"
-                              draggable={user?.role !== 'viewer'}
-                              onDragStart={(e) => {
-                                e.stopPropagation();
-                                didDragRef.current = false;
-                                e.dataTransfer.setData('text/plain', task.id);
-                                e.dataTransfer.effectAllowed = 'move';
-                                draggedTaskIdRef.current = task.id;
-                                setDraggedTaskId(task.id);
-                              }}
-                              onDrag={(e) => {
-                                if (e.clientX !== 0 || e.clientY !== 0) didDragRef.current = true;
-                              }}
-                              onDragEnd={() => {
-                                if (didDragRef.current) suppressClickRef.current = true;
-                                draggedTaskIdRef.current = null;
-                                setDraggedTaskId(null);
-                                setDragOverTaskId(null);
-                                setDragOverColumnId(null);
-                                window.setTimeout(() => {
+                            return (
+                              <Card
+                                key={task.id}
+                                draggable={user?.role !== 'viewer'}
+                                onDragStart={(e) => {
+                                  e.stopPropagation();
                                   didDragRef.current = false;
-                                  suppressClickRef.current = false;
-                                }, 100);
-                              }}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                e.dataTransfer.dropEffect = 'move';
-                                setDragOverTaskId(task.id);
-                                setDragOverColumnId(col.id);
-                              }}
-                              onDragLeave={(e) => {
-                                if (e.currentTarget.contains(e.relatedTarget)) return;
-                                setDragOverTaskId(null);
-                              }}
-                              onDrop={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleTaskDrop(col.id, task.id, e);
-                              }}
-                              style={{
-                                cursor: user?.role !== 'viewer' ? 'grab' : 'pointer',
-                                opacity: isDraggingThis ? 0.4 : 1,
-                                border: isDragOverThis ? '2px solid #3b82f6' : undefined,
-                                backgroundColor: isDragOverThis ? 'rgba(59, 130, 246, 0.1)' : undefined,
-                                transition: 'all 0.15s ease',
-                              }}
-                              onClick={() => {
-                                if (suppressClickRef.current) return;
-                                setActiveTaskId(task.id);
-                              }}
-                            >
-                              <Group justify="space-between" mb={4}>
-                                <Group gap={4}>
-                                  {user?.role !== 'viewer' && (
-                                    <IconGripVertical size={14} color="#6b7280" style={{ cursor: 'grab' }} />
-                                  )}
-                                  <Text size="xs" c="dimmed" fw={700}>
-                                    {task.ref}
-                                  </Text>
-                                </Group>
-                                <Group gap={4} onClick={(e) => e.stopPropagation()}>
-                                  {project && (
-                                    <Badge color={project.colour || 'blue'} variant="light" size="xs">
-                                      {project.name}
-                                    </Badge>
-                                  )}
-                                  {(user?.role === 'admin' || task.createdBy === user?.id) && (
-                                    <ActionIcon variant="subtle" color="red" size="xs" onClick={(e) => handleOpenDelete(e, task)}>
-                                      <IconTrash size={14} />
-                                    </ActionIcon>
-                                  )}
-                                </Group>
-                              </Group>
-
-                              <Text size="sm" fw={600} mb="xs" lineClamp={2}>
-                                {task.title}
-                              </Text>
-
-                              <Stack gap={4} mb="xs">
-                                <Progress value={task.progress} color={col.color} size="xs" radius="xl" />
-                              </Stack>
-
-                              <Group justify="space-between" pt={4}>
-                                {assignee ? (
-                                  <Tooltip label={`Assigned to ${assignee.name}`}>
-                                    <Avatar size="xs" radius="xl" color={assignee.color || 'blue'}>
-                                      {assignee.name[0].toUpperCase()}
-                                    </Avatar>
-                                  </Tooltip>
-                                ) : <div />}
-
-                                {task.dueDate && (
-                                  <Text size="xs" c={task.dueDate < new Date().toISOString().slice(0, 10) && task.status !== 'done' ? 'red' : 'dimmed'}>
-                                    {task.dueDate}
-                                  </Text>
+                                  e.dataTransfer.setData('text/plain', task.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  draggedTaskIdRef.current = task.id;
+                                  setDraggedTaskId(task.id);
+                                }}
+                                onDrag={(e) => {
+                                  if (e.clientX !== 0 || e.clientY !== 0) didDragRef.current = true;
+                                }}
+                                onDragEnd={() => {
+                                  if (didDragRef.current) suppressClickRef.current = true;
+                                  draggedTaskIdRef.current = null;
+                                  setDraggedTaskId(null);
+                                  setDragOverTaskId(null);
+                                  setDragOverColumnId(null);
+                                  window.setTimeout(() => {
+                                    didDragRef.current = false;
+                                    suppressClickRef.current = false;
+                                  }, 100);
+                                }}
+                                onDragOver={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  e.dataTransfer.dropEffect = 'move';
+                                  setDragOverTaskId(task.id);
+                                  setDragOverColumnId(col.id);
+                                }}
+                                onDragLeave={(e) => {
+                                  if (e.currentTarget.contains(e.relatedTarget)) return;
+                                  setDragOverTaskId(null);
+                                }}
+                                onDrop={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleTaskDrop(col.id, task.id, e);
+                                }}
+                                className={cn(
+                                  'cursor-pointer shadow-sm transition-all',
+                                  user?.role !== 'viewer' && 'cursor-grab active:cursor-grabbing',
+                                  isDraggingThis && 'opacity-40',
+                                  isDragOverThis && 'border-2 border-primary bg-primary/10'
                                 )}
-                              </Group>
-                            </Card>
-                          );
-                        })
-                      )}
-                    </Stack>
-                  </ScrollArea>
-                </Paper>
-              );
-            })}
-          </Box>
-        </Tabs.Panel>
+                                onClick={() => {
+                                  if (suppressClickRef.current) return;
+                                  setActiveTaskId(task.id);
+                                }}
+                              >
+                                <CardContent className="p-3">
+                                  <div className="mb-1 flex items-center justify-between">
+                                    <div className="flex items-center gap-1">
+                                      {user?.role !== 'viewer' && (
+                                        <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                      )}
+                                      <span className="text-xs font-bold text-muted-foreground">{task.ref}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                      {project && (
+                                        <Badge
+                                          variant="secondary"
+                                          className={cn(getColorClasses(project.colour || 'blue', 'light'))}
+                                          style={getBadgeStyle(project.colour)}
+                                        >
+                                          {project.name}
+                                        </Badge>
+                                      )}
+                                      {(user?.role === 'admin' || task.createdBy === user?.id) && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-destructive hover:text-destructive"
+                                          onClick={(e) => handleOpenDelete(e, task)}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
 
-        {/* List View Panel */}
-        <Tabs.Panel value="list" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          <Paper withBorder radius="md">
-            <Table highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Ref</Table.Th>
-                  <Table.Th>Title</Table.Th>
-                  <Table.Th>Project</Table.Th>
-                  <Table.Th>Assignee</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Progress</Table.Th>
-                  <Table.Th>Due Date</Table.Th>
-                  <Table.Th>Actions</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filteredTasks.length === 0 ? (
-                  <Table.Tr>
-                    <Table.Td colSpan={8} style={{ textAlign: 'center' }}>
-                      <Text c="dimmed" py="md">No tasks found.</Text>
-                    </Table.Td>
-                  </Table.Tr>
-                ) : (
-                  filteredTasks.map((t) => {
-                    const project = projects.find((p) => p.id === t.projectId);
-                    const assignee = users.find((u) => u.id === t.assigneeId);
-                    return (
-                      <Table.Tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setActiveTaskId(t.id)}>
-                        <Table.Td><Text size="xs" fw={700}>{t.ref}</Text></Table.Td>
-                        <Table.Td><Text size="sm" fw={600}>{t.title}</Text></Table.Td>
-                        <Table.Td>
-                          {project ? (
-                            <Badge color={project.colour || 'blue'} variant="light" size="xs">
-                              {project.name}
-                            </Badge>
-                          ) : '-'}
-                        </Table.Td>
-                        <Table.Td>{assignee ? assignee.name : 'Unassigned'}</Table.Td>
-                        <Table.Td>
-                          <Badge color={COLUMNS.find((c) => c.id === t.status)?.color || 'gray'} size="xs">
-                            {t.status.replace('_', ' ')}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td style={{ width: 120 }}>
-                          <Group gap="xs">
-                            <Progress value={t.progress} color="blue" size="xs" radius="xl" style={{ flex: 1 }} />
-                            <Text size="xs">{t.progress}%</Text>
-                          </Group>
-                        </Table.Td>
-                        <Table.Td><Text size="xs">{t.dueDate || '-'}</Text></Table.Td>
-                        <Table.Td onClick={(e) => e.stopPropagation()}>
-                          <Group gap={4}>
-                            <ActionIcon onClick={(e) => handleOpenEdit(e, t.id)}>
-                              <IconPencil size={16} />
-                            </ActionIcon>
-                            {(user?.role === 'admin' || t.createdBy === user?.id) && (
-                              <ActionIcon color="red" variant="subtle" onClick={(e) => handleOpenDelete(e, t)}>
-                                <IconTrash size={16} />
-                              </ActionIcon>
+                                  <p className="mb-2 line-clamp-2 text-sm font-semibold">{task.title}</p>
+
+                                  <Progress
+                                    value={task.progress}
+                                    className="mb-2 h-1"
+                                    indicatorClassName={getColorClasses(col.color, 'progress')}
+                                  />
+
+                                  <div className="flex items-center justify-between pt-1">
+                                    {assignee ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Avatar className="h-6 w-6">
+                                            <AvatarFallback
+                                              className={cn('text-xs', getColorClasses(assignee.color || 'blue', 'avatar'))}
+                                            >
+                                              {assignee.name[0].toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Assigned to {assignee.name}</TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <div />
+                                    )}
+                                    {task.dueDate && (
+                                      <span
+                                        className={cn(
+                                          'text-xs',
+                                          task.dueDate < todayStr && task.status !== 'done'
+                                            ? 'text-destructive'
+                                            : 'text-muted-foreground'
+                                        )}
+                                      >
+                                        {task.dueDate}
+                                      </span>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-0 min-h-0 flex-1 overflow-y-auto data-[state=inactive]:hidden">
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ref</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Assignee</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Progress</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTasks.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                        No tasks found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredTasks.map((t) => {
+                      const project = projects.find((p) => p.id === t.projectId);
+                      const assignee = users.find((u) => u.id === t.assigneeId);
+                      const statusCol = COLUMNS.find((c) => c.id === t.status);
+                      return (
+                        <TableRow
+                          key={t.id}
+                          className="cursor-pointer"
+                          onClick={() => setActiveTaskId(t.id)}
+                        >
+                          <TableCell>
+                            <span className="text-xs font-bold">{t.ref}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-semibold">{t.title}</span>
+                          </TableCell>
+                          <TableCell>
+                            {project ? (
+                              <Badge
+                                variant="secondary"
+                                className={cn(getColorClasses(project.colour || 'blue', 'light'))}
+                                style={getBadgeStyle(project.colour)}
+                              >
+                                {project.name}
+                              </Badge>
+                            ) : (
+                              '-'
                             )}
-                          </Group>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })
-                )}
-              </Table.Tbody>
-            </Table>
-          </Paper>
-        </Tabs.Panel>
-      </Tabs>
+                          </TableCell>
+                          <TableCell>{assignee ? assignee.name : 'Unassigned'}</TableCell>
+                          <TableCell>
+                            <Badge
+                              className={cn(
+                                'border-transparent text-white',
+                                getColorClasses(statusCol?.color || 'gray', 'badge')
+                              )}
+                            >
+                              {t.status.replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="w-[120px]">
+                            <div className="flex items-center gap-2">
+                              <Progress value={t.progress} className="h-1 flex-1" />
+                              <span className="text-xs">{t.progress}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs">{t.dueDate || '-'}</span>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleOpenEdit(e, t.id)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {(user?.role === 'admin' || t.createdBy === user?.id) && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={(e) => handleOpenDelete(e, t)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
-      {/* New Task Modal */}
-      <TaskModal
-        opened={createModalOpened}
-        onClose={() => setCreateModalOpened(false)}
-      />
+        <TaskModal opened={createModalOpened} onClose={() => setCreateModalOpened(false)} defaultProjectId={projectId} />
 
-      {/* Edit Task Modal */}
-      <TaskModal
-        taskId={editTaskId}
-        opened={editModalOpened}
-        onClose={() => {
-          setEditModalOpened(false);
-          setEditTaskId(null);
-        }}
-      />
+        <TaskModal
+          taskId={editTaskId}
+          opened={editModalOpened}
+          onClose={() => {
+            setEditModalOpened(false);
+            setEditTaskId(null);
+          }}
+        />
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        centered
-        opened={deleteModalOpened}
-        onClose={() => setDeleteModalOpened(false)}
-        title={
-          <Group gap="xs">
-            <IconAlertTriangle size={20} color="#ef4444" />
-            <Text fw={700}>Delete Task?</Text>
-          </Group>
-        }
-        size={520}
-        radius="lg"
-      >
-        <Stack gap="md">
-          <Text size="sm">
-            Are you sure you want to delete <strong>"{taskToDelete?.title}"</strong>? It will be moved to the Recycle Bin where you can restore it or delete it permanently.
-          </Text>
-
-          <Group justify="flex-end" gap="sm">
-            <Button variant="default" onClick={() => setDeleteModalOpened(false)}>
-              Cancel
-            </Button>
-            <Button color="red" loading={deleting} onClick={handleConfirmDelete}>
-              Delete Task
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-    </Stack>
+        <Dialog open={deleteModalOpened} onOpenChange={setDeleteModalOpened}>
+          <DialogContent className="sm:max-w-[520px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Delete Task?
+              </DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete <strong>&quot;{taskToDelete?.title}&quot;</strong>? It will be moved
+                to the Recycle Bin where you can restore it or delete it permanently.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteModalOpened(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" disabled={deleting} onClick={handleConfirmDelete}>
+                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                Delete Task
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }

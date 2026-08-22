@@ -1,22 +1,16 @@
 import React, { useState } from 'react';
-import {
-  Paper,
-  Title,
-  Text,
-  TextInput,
-  PasswordInput,
-  Button,
-  Stack,
-  Container,
-  Group,
-  ThemeIcon,
-  Badge,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { IconLock } from '@tabler/icons-react';
+import { LogIn, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { showNotification } from '@/lib/notify';
+import { AuthLayout } from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 
-export function LoginView() {
+export function LoginView({ onBack, onGetStarted, setupNeeded }) {
   const { login, orgName } = useAuth();
 
   const [username, setUsername] = useState('');
@@ -26,56 +20,82 @@ export function LoginView() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password) {
-      notifications.show({ title: 'Error', message: 'Enter username and password', color: 'red' });
+      showNotification({ title: 'Error', message: 'Enter username and password', color: 'red' });
       return;
     }
     try {
       setLoading(true);
       await login(username, password);
-      notifications.show({ title: 'Welcome back!', message: 'Signed in successfully.', color: 'green' });
+      showNotification({ title: 'Welcome back!', message: 'Signed in successfully.', color: 'green' });
     } catch (err) {
-      notifications.show({ title: 'Sign In Failed', message: err.message, color: 'red' });
+      showNotification({ title: 'Sign In Failed', message: err.message, color: 'red' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Container size={420} my={80}>
-      <Stack align="center" mb="xl">
-        <ThemeIcon size={54} radius="xl" color="blue" variant="light">
-          <IconLock size={28} />
-        </ThemeIcon>
-        <Title order={2} ta="center">Sign in to Orbdyn</Title>
-        <Badge variant="filled" color="blue" size="lg">
-          {orgName}
-        </Badge>
-      </Stack>
+    <AuthLayout
+      onBack={onBack}
+      title="Welcome back"
+      description="Sign in with your email or username."
+      icon={LogIn}
+      footer={
+        setupNeeded && onGetStarted ? (
+          <p className="text-sm text-muted-foreground">
+            First time here?{' '}
+            <button type="button" className="font-medium text-primary hover:underline" onClick={onGetStarted}>
+              Create an account
+            </button>
+          </p>
+        ) : null
+      }
+    >
+      <Card className="border-primary/10 bg-card/95 shadow-xl backdrop-blur">
+        <CardHeader className="space-y-2 pb-3 pt-5">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Sign in</CardTitle>
+            <Badge variant="secondary" className="font-normal">
+              {orgName}
+            </Badge>
+          </div>
+          <CardDescription>Open your projects and team workspace.</CardDescription>
+        </CardHeader>
+        <CardContent className="pb-6">
+          <form onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="username">Username or email</Label>
+                <Input
+                  id="username"
+                  placeholder="Username or email address"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoComplete="username"
+                />
+              </div>
 
-      <Paper withBorder shadow="md" p={30} radius="md">
-        <form onSubmit={handleSubmit}>
-          <Stack spacing="md">
-            <TextInput
-              label="Username"
-              placeholder="Your username"
-              value={username}
-              onChange={(e) => setUsername(e.currentTarget.value)}
-              required
-            />
-            <PasswordInput
-              label="Password"
-              placeholder="Your password"
-              value={password}
-              onChange={(e) => setPassword(e.currentTarget.value)}
-              required
-            />
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="password">Password</Label>
+                <PasswordInput
+                  id="password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
 
-            <Button type="submit" fullWidth mt="md" size="md" color="blue" loading={loading}>
-              Sign In
-            </Button>
-          </Stack>
-        </form>
-      </Paper>
-    </Container>
+              <Button type="submit" className="mt-1 w-full" size="lg" disabled={loading}>
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Sign in
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </AuthLayout>
   );
 }

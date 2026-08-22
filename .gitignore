@@ -8,6 +8,7 @@ public/assets/
 # Environment and secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 credentials.json

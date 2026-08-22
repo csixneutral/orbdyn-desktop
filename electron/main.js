@@ -1,25 +1,25 @@
 /*
  * main.js -- the Orbdyn desktop window.
  *
- * PLAIN ENGLISH: This is what runs when you double-click the Orbdyn icon.
- * It quietly starts the Orbdyn server on your computer, opens a normal-looking
- * desktop window pointed at it, puts an icon in your system tray / menu bar,
- * and shows a real operating-system pop-up whenever a notification arrives.
+ * Electron loads the built React UI and connects to Supabase in the cloud.
+ * No local Express server is required.
  */
 
 const { app, BrowserWindow, Tray, Menu, Notification, shell, dialog, nativeImage } = require('electron');
 const path = require('path');
 
-// Windows needs this so notifications show "Orbdyn" instead of "electron.app".
 app.setAppUserModelId('com.orbdyn.desktop');
-
-const server = require('../server/index.js');
-const store = require('../server/store.js');
-const tunnel = require('../server/tunnel.js');
 
 let win = null;
 let tray = null;
 let quitting = false;
+
+function appUrl() {
+  // npm start builds the UI first (prestart) and loads the packaged files here.
+  // Set ORBDYN_DEV=1 with `npm run dev` if you want Vite hot reload on :3000.
+  if (process.env.ORBDYN_DEV === '1') return 'http://localhost:3000';
+  return `file://${path.join(__dirname, '..', 'public', 'index.html').replace(/\\/g, '/')}`;
+}
 
 function iconImage() {
   const file = path.join(__dirname, '..', 'assets', 'icon.png');
@@ -47,22 +47,22 @@ function createWindow() {
     },
   });
 
-  win.loadURL('http://127.0.0.1:' + server.PORT);
+  win.loadURL(appUrl());
   win.once('ready-to-show', () => win.show());
 
-  // Links to other websites open in the normal browser, not inside Orbdyn.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1:' + server.PORT) || url.startsWith('http://localhost:' + server.PORT)) {
+    if (url.startsWith('http://localhost:3000') || url.startsWith('file://')) {
       return { action: 'allow' };
     }
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  // Closing the window keeps Orbdyn running in the tray so colleagues can
-  // still reach your documents and you still get notifications.
   win.on('close', (e) => {
-    if (!quitting) { e.preventDefault(); win.hide(); }
+    if (!quitting) {
+      e.preventDefault();
+      win.hide();
+    }
   });
 }
 
@@ -70,24 +70,29 @@ function buildTray() {
   try {
     const img = iconImage();
     tray = new Tray(img || nativeImage.createEmpty());
-  } catch (_) { return; }
+  } catch (_) {
+    return;
+  }
+
   const rebuild = () => {
-    const s = tunnel.status();
-    tray.setToolTip('Orbdyn' + (s.url ? ' — shared at ' + s.url : ''));
-    tray.setContextMenu(Menu.buildFromTemplate([
-      { label: 'Open Orbdyn', click: () => { win.show(); win.focus(); } },
-      { type: 'separator' },
-      { label: 'Open my Orbdyn folder', click: () => shell.openPath(store.HOME) },
-      s.url
-        ? { label: 'Copy sharing link', click: () => require('electron').clipboard.writeText(s.url) }
-        : { label: 'Not shared online', enabled: false },
-      { type: 'separator' },
-      { label: 'Quit Orbdyn', click: () => { quitting = true; app.quit(); } },
-    ]));
+    tray.setToolTip('Orbdyn — cloud workspace');
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: 'Open Orbdyn', click: () => { win.show(); win.focus(); } },
+        { type: 'separator' },
+        { label: 'Quit Orbdyn', click: () => { quitting = true; app.quit(); } },
+      ])
+    );
   };
+
   rebuild();
-  tunnel.onChange(rebuild);
-  tray.on('click', () => { win.isVisible() ? win.hide() : (win.show(), win.focus()); });
+  tray.on('click', () => {
+    if (win.isVisible()) win.hide();
+    else {
+      win.show();
+      win.focus();
+    }
+  });
 }
 
 function menu() {
@@ -96,14 +101,13 @@ function menu() {
     {
       label: 'File',
       submenu: [
-        { label: 'Open my Orbdyn folder', click: () => shell.openPath(store.HOME) },
         {
-          label: 'Where is my data?',
+          label: 'About Orbdyn',
           click: () => dialog.showMessageBox(win, {
             type: 'info',
-            title: 'Your Orbdyn data',
-            message: 'Everything is stored on this computer',
-            detail: store.HOME + '\n\nWork list: orbdyn-data.json\nDocuments: files/\nDated backups: backups/\n\nNothing is stored on any online service.',
+            title: 'Orbdyn',
+            message: 'Orbdyn cloud workspace',
+            detail: 'Your workspace data is stored securely in Supabase.\nSign in with your team credentials to collaborate from anywhere.',
           }),
         },
         { type: 'separator' },
@@ -117,21 +121,17 @@ function menu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-// Only one copy of Orbdyn may run, otherwise two copies would fight over the
-// same data file.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
-
-  app.whenReady().then(async () => {
-    try {
-      await server.start();
-    } catch (err) {
-      dialog.showErrorBox('Orbdyn could not start', String(err && err.message || err));
-      app.quit();
-      return;
+  app.on('second-instance', () => {
+    if (win) {
+      win.show();
+      win.focus();
     }
+  });
+
+  app.whenReady().then(() => {
     createWindow();
     buildTray();
     menu();
@@ -145,11 +145,14 @@ if (!app.requestSingleInstanceLock()) {
     });
     ipcMain.on('orbdyn:badge', (_e, count) => {
       if (process.platform === 'darwin') app.dock.setBadge(count ? String(count) : '');
-      if (win) win.setOverlayIcon && win.setOverlayIcon(null, count ? String(count) + ' unread' : '');
+      if (win && win.setOverlayIcon) win.setOverlayIcon(null, count ? String(count) + ' unread' : '');
     });
   });
 
-  app.on('before-quit', () => { quitting = true; try { tunnel.stop(); store.flush(); } catch (_) {} });
-  app.on('window-all-closed', () => { /* stay alive in the tray */ });
-  app.on('activate', () => { if (win) { win.show(); } else createWindow(); });
+  app.on('before-quit', () => { quitting = true; });
+  app.on('window-all-closed', () => {});
+  app.on('activate', () => {
+    if (win) win.show();
+    else createWindow();
+  });
 }

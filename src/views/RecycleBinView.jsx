@@ -1,28 +1,38 @@
 import React, { useState } from 'react';
 import {
-  Paper,
-  Title,
-  Text,
-  Group,
-  Button,
-  Stack,
-  Badge,
-  Table,
-  ActionIcon,
-  Modal,
-  Tabs,
-  Tooltip,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  Folder,
+  ListChecks,
+  FileText,
+  User,
+  Loader2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  IconTrash,
-  IconRefresh,
-  IconAlertTriangle,
-  IconFolder,
-  IconChecklist,
-  IconFileText,
-  IconUser,
-} from '@tabler/icons-react';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { showNotification } from '@/lib/notify.js';
+import { getColorClasses } from '@/lib/colors';
+import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/ui/typography';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -34,7 +44,7 @@ export function RecycleBinView() {
   const [activeTab, setActiveTab] = useState('all');
   const [confirmModalOpened, setConfirmModalOpened] = useState(false);
   const [targetItem, setTargetItem] = useState(null);
-  const [actionType, setActionType] = useState(null); // 'deletePermanent' | 'emptyAll'
+  const [actionType, setActionType] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   const filteredTrash = (trash || []).filter((item) => {
@@ -49,10 +59,14 @@ export function RecycleBinView() {
   const handleRestore = async (item) => {
     try {
       await api.restoreTrash(item.id);
-      notifications.show({ title: 'Restored!', message: `"${item.name}" has been restored to your workspace.`, color: 'green' });
+      showNotification({
+        title: 'Restored!',
+        message: `"${item.name}" has been restored to your workspace.`,
+        color: 'green',
+      });
       refresh();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     }
   };
 
@@ -73,15 +87,23 @@ export function RecycleBinView() {
       setSubmitting(true);
       if (actionType === 'deletePermanent' && targetItem) {
         await api.deleteTrashPermanent(targetItem.id);
-        notifications.show({ title: 'Permanently Deleted', message: `"${targetItem.name}" was permanently removed.`, color: 'blue' });
+        showNotification({
+          title: 'Permanently Deleted',
+          message: `"${targetItem.name}" was permanently removed.`,
+          color: 'blue',
+        });
       } else if (actionType === 'emptyAll') {
         await api.emptyTrash();
-        notifications.show({ title: 'Emptied', message: 'All items in the Recycle Bin were permanently deleted.', color: 'blue' });
+        showNotification({
+          title: 'Emptied',
+          message: 'All items in the Recycle Bin were permanently deleted.',
+          color: 'blue',
+        });
       }
       setConfirmModalOpened(false);
       refresh();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setSubmitting(false);
     }
@@ -89,162 +111,175 @@ export function RecycleBinView() {
 
   const getTypeIcon = (type) => {
     switch (type) {
-      case 'project': return <IconFolder size={16} color="#3d7fe0" />;
-      case 'task': return <IconChecklist size={16} color="#10b981" />;
-      case 'file': return <IconFileText size={16} color="#8b5cf6" />;
-      case 'user': return <IconUser size={16} color="#f59e0b" />;
-      default: return <IconTrash size={16} />;
+      case 'project':
+        return <Folder className="h-4 w-4 text-[#3d7fe0]" />;
+      case 'task':
+        return <ListChecks className="h-4 w-4 text-emerald-500" />;
+      case 'file':
+        return <FileText className="h-4 w-4 text-violet-500" />;
+      case 'user':
+        return <User className="h-4 w-4 text-amber-500" />;
+      default:
+        return <Trash2 className="h-4 w-4" />;
     }
   };
 
   const getTypeBadge = (type) => {
-    switch (type) {
-      case 'project': return <Badge color="blue" variant="filled" size="xs">Project</Badge>;
-      case 'task': return <Badge color="green" variant="filled" size="xs">Task</Badge>;
-      case 'file': return <Badge color="violet" variant="filled" size="xs">Document</Badge>;
-      case 'user': return <Badge color="amber" variant="filled" size="xs">Person</Badge>;
-      default: return <Badge color="gray" size="xs">{type}</Badge>;
-    }
+    const colorMap = {
+      project: 'blue',
+      task: 'green',
+      file: 'violet',
+      user: 'amber',
+    };
+    const labels = {
+      project: 'Project',
+      task: 'Task',
+      file: 'Document',
+      user: 'Person',
+    };
+    const color = colorMap[type] || 'gray';
+    return (
+      <Badge className={cn('border-transparent text-white', getColorClasses(color, 'badge'))}>
+        {labels[type] || type}
+      </Badge>
+    );
   };
 
   return (
-    <Stack gap="lg">
-      <Group justify="space-between" align="center">
-        <div>
-          <Title order={2}>Recycle Bin</Title>
-          <Text c="dimmed" size="sm">
-            Deleted items are held here safely. Restore them or delete permanently.
-          </Text>
-        </div>
-
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Recycle Bin"
+        description="Deleted items are held here safely. Restore them or delete permanently."
+      >
         {trash.length > 0 && user?.role !== 'viewer' && (
           <Button
-            leftSection={<IconTrash size={16} />}
-            color="red"
-            variant="light"
+            variant="destructive"
+            className="bg-destructive/15 text-destructive hover:bg-destructive/25"
             onClick={handlePromptEmptyAll}
           >
+            <Trash2 className="h-4 w-4" />
             Empty Recycle Bin
           </Button>
         )}
-      </Group>
+      </PageHeader>
 
-      <Tabs value={activeTab} onChange={setActiveTab}>
-        <Tabs.List mb="md">
-          <Tabs.Tab value="all">
-            All ({trash.length})
-          </Tabs.Tab>
-          <Tabs.Tab value="project" leftSection={<IconFolder size={14} />}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="all">All ({trash.length})</TabsTrigger>
+          <TabsTrigger value="project">
+            <Folder className="h-3.5 w-3.5" />
             Projects ({trash.filter((i) => i.type === 'project').length})
-          </Tabs.Tab>
-          <Tabs.Tab value="task" leftSection={<IconChecklist size={14} />}>
+          </TabsTrigger>
+          <TabsTrigger value="task">
+            <ListChecks className="h-3.5 w-3.5" />
             Tasks ({trash.filter((i) => i.type === 'task').length})
-          </Tabs.Tab>
-          <Tabs.Tab value="file" leftSection={<IconFileText size={14} />}>
+          </TabsTrigger>
+          <TabsTrigger value="file">
+            <FileText className="h-3.5 w-3.5" />
             Documents ({trash.filter((i) => i.type === 'file').length})
-          </Tabs.Tab>
-          <Tabs.Tab value="user" leftSection={<IconUser size={14} />}>
+          </TabsTrigger>
+          <TabsTrigger value="user">
+            <User className="h-3.5 w-3.5" />
             People ({trash.filter((i) => i.type === 'user').length})
-          </Tabs.Tab>
-        </Tabs.List>
+          </TabsTrigger>
+        </TabsList>
 
-        <Paper withBorder radius="md">
-          <Table highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Item Name</Table.Th>
-                <Table.Th>Type</Table.Th>
-                <Table.Th>Deleted By</Table.Th>
-                <Table.Th>Deleted Date</Table.Th>
-                <Table.Th style={{ textAlign: 'right' }}>Actions</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filteredTrash.length === 0 ? (
-                <Table.Tr>
-                  <Table.Td colSpan={5} style={{ textAlign: 'center' }}>
-                    <Text c="dimmed" py="xl">Recycle Bin is empty.</Text>
-                  </Table.Td>
-                </Table.Tr>
-              ) : (
-                filteredTrash.map((item) => (
-                  <Table.Tr key={item.id}>
-                    <Table.Td>
-                      <Group gap="xs">
-                        {getTypeIcon(item.type)}
-                        <Text size="sm" fw={600}>{item.name}</Text>
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>{getTypeBadge(item.type)}</Table.Td>
-                    <Table.Td><Text size="sm">{item.deletedByName || 'Unknown'}</Text></Table.Td>
-                    <Table.Td><Text size="xs" c="dimmed">{new Date(item.deletedAt).toLocaleString()}</Text></Table.Td>
-                    <Table.Td>
-                      <Group justify="flex-end" gap="xs">
-                        {user?.role !== 'viewer' && (
-                          <Button
-                            size="xs"
-                            variant="light"
-                            color="green"
-                            leftSection={<IconRefresh size={14} />}
-                            onClick={() => handleRestore(item)}
-                          >
-                            Restore
-                          </Button>
-                        )}
-                        {user?.role !== 'viewer' && (
-                          <Button
-                            size="xs"
-                            variant="subtle"
-                            color="red"
-                            leftSection={<IconTrash size={14} />}
-                            onClick={() => handlePromptDeletePermanent(item)}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                      </Group>
-                    </Table.Td>
-                  </Table.Tr>
-                ))
-              )}
-            </Table.Tbody>
-          </Table>
-        </Paper>
+        <TabsContent value={activeTab} className="mt-4">
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Item Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Deleted By</TableHead>
+                  <TableHead>Deleted Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTrash.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
+                      Recycle Bin is empty.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTrash.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getTypeIcon(item.type)}
+                          <span className="text-sm font-semibold">{item.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getTypeBadge(item.type)}</TableCell>
+                      <TableCell>
+                        <span className="text-sm">{item.deletedByName || 'Unknown'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(item.deletedAt).toLocaleString()}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          {user?.role !== 'viewer' && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="bg-green-500/15 text-green-400 hover:bg-green-500/25"
+                              onClick={() => handleRestore(item)}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5" />
+                              Restore
+                            </Button>
+                          )}
+                          {user?.role !== 'viewer' && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => handlePromptDeletePermanent(item)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
       </Tabs>
 
-      {/* Confirmation Modal */}
-      <Modal
-        centered
-        opened={confirmModalOpened}
-        onClose={() => setConfirmModalOpened(false)}
-        title={
-          <Group gap="xs">
-            <IconAlertTriangle size={20} color="#ef4444" />
-            <Text fw={700}>
+      <Dialog open={confirmModalOpened} onOpenChange={setConfirmModalOpened}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
               {actionType === 'emptyAll' ? 'Empty Recycle Bin?' : 'Delete Permanently?'}
-            </Text>
-          </Group>
-        }
-        size={520}
-        radius="lg"
-      >
-        <Stack gap="md">
-          <Text size="sm">
-            {actionType === 'emptyAll'
-              ? 'Are you sure you want to permanently delete ALL items in the Recycle Bin? This action CANNOT be undone.'
-              : `Are you sure you want to permanently delete "${targetItem?.name}"? This action CANNOT be undone.`}
-          </Text>
-
-          <Group justify="flex-end" gap="sm">
-            <Button variant="default" onClick={() => setConfirmModalOpened(false)}>
+            </DialogTitle>
+            <DialogDescription>
+              {actionType === 'emptyAll'
+                ? 'Are you sure you want to permanently delete ALL items in the Recycle Bin? This action CANNOT be undone.'
+                : `Are you sure you want to permanently delete "${targetItem?.name}"? This action CANNOT be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmModalOpened(false)}>
               Cancel
             </Button>
-            <Button color="red" loading={submitting} onClick={handleConfirmAction}>
+            <Button variant="destructive" disabled={submitting} onClick={handleConfirmAction}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Delete Permanently
             </Button>
-          </Group>
-        </Stack>
-      </Modal>
-    </Stack>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

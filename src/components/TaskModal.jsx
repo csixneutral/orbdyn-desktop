@@ -1,42 +1,87 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Modal,
-  TextInput,
-  Textarea,
-  Select,
-  MultiSelect,
-  NumberInput,
-  Slider,
-  Button,
-  Group,
-  Stack,
-  Text,
-  Badge,
-  Paper,
-  Avatar,
-  Divider,
-  ActionIcon,
-  SegmentedControl,
-  ThemeIcon,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+  CheckSquare,
+  Send,
+  Trash2,
+  Folder,
+  User,
+  Calendar,
+  Clock,
+  ListChecks,
+  FileText,
+  Plus,
+  Loader2,
+} from 'lucide-react';
 import {
-  IconSend,
-  IconTrash,
-  IconChecklist,
-  IconFolder,
-  IconUser,
-  IconCalendar,
-  IconClock,
-  IconProgressCheck,
-  IconFileText,
-  IconPlus,
-} from '@tabler/icons-react';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
-export function TaskModal({ taskId, opened, onClose }) {
+const AVATAR_COLORS = {
+  blue: '#3b82f6',
+  green: '#10b981',
+  red: '#ef4444',
+  orange: '#f59e0b',
+  purple: '#8b5cf6',
+  pink: '#ec4899',
+  gray: '#6b7280',
+  yellow: '#eab308',
+};
+
+function getAvatarBg(color) {
+  if (!color) return AVATAR_COLORS.blue;
+  if (color.startsWith('#')) return color;
+  return AVATAR_COLORS[color] || AVATAR_COLORS.blue;
+}
+
+function SegmentedControl({ value, onChange, options, activeClassName }) {
+  return (
+    <div className="flex rounded-md border bg-muted/40 p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            'flex-1 rounded-sm px-2 py-1.5 text-xs font-medium transition-colors',
+            value === opt.value
+              ? cn('bg-background text-foreground shadow-sm', activeClassName)
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
   const { user } = useAuth();
   const { projects, users, refresh } = useData();
 
@@ -60,12 +105,12 @@ export function TaskModal({ taskId, opened, onClose }) {
     } else {
       resetForm();
     }
-  }, [taskId, opened]);
+  }, [taskId, opened, defaultProjectId]);
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setProjectId(projects[0]?.id || null);
+    setProjectId(defaultProjectId || projects[0]?.id || null);
     setAssigneeIds(user?.id ? [user.id] : []);
     setStatus('todo');
     setPriority('normal');
@@ -83,7 +128,9 @@ export function TaskModal({ taskId, opened, onClose }) {
         setTitle(task.title || '');
         setDescription(task.description || '');
         setProjectId(task.projectId || null);
-        setAssigneeIds(task.assigneeIds?.length ? task.assigneeIds : (task.assigneeId ? [task.assigneeId] : []));
+        setAssigneeIds(
+          task.assigneeIds?.length ? task.assigneeIds : task.assigneeId ? [task.assigneeId] : []
+        );
         setStatus(task.status || 'todo');
         setPriority(task.priority || 'normal');
         setProgress(task.progress || 0);
@@ -100,7 +147,7 @@ export function TaskModal({ taskId, opened, onClose }) {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      notifications.show({ title: 'Error', message: 'Task title is required', color: 'red' });
+      showNotification({ title: 'Error', message: 'Task title is required', color: 'red' });
       return;
     }
     try {
@@ -120,15 +167,15 @@ export function TaskModal({ taskId, opened, onClose }) {
 
       if (taskId) {
         await api.updateTask(taskId, payload);
-        notifications.show({ title: 'Success', message: 'Work item updated', color: 'green' });
+        showNotification({ title: 'Success', message: 'Work item updated', color: 'green' });
       } else {
         await api.createTask(payload);
-        notifications.show({ title: 'Success', message: 'Work item created', color: 'green' });
+        showNotification({ title: 'Success', message: 'Work item created', color: 'green' });
       }
       refresh();
       onClose();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setSubmitting(false);
     }
@@ -138,11 +185,11 @@ export function TaskModal({ taskId, opened, onClose }) {
     if (!window.confirm('Delete this task?')) return;
     try {
       await api.deleteTask(taskId);
-      notifications.show({ title: 'Deleted', message: 'Work item removed', color: 'blue' });
+      showNotification({ title: 'Deleted', message: 'Work item removed', color: 'blue' });
       refresh();
       onClose();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     }
   };
 
@@ -154,305 +201,285 @@ export function TaskModal({ taskId, opened, onClose }) {
       setComments((prev) => [...prev, res.comment]);
       setNewComment('');
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     }
   };
 
+  const assigneeOptions = (() => {
+    const selProj = projects.find((p) => p.id === projectId);
+    if (selProj && selProj.visibility === 'members') {
+      const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
+      return users
+        .filter((u) => u.active !== false && allowedIds.has(u.id))
+        .map((u) => ({ value: u.id, label: u.name }));
+    }
+    return users.filter((u) => u.active !== false).map((u) => ({ value: u.id, label: u.name }));
+  })();
+
   return (
-    <Modal
-      centered
-      opened={opened}
-      onClose={onClose}
-      title={
-        <Group gap="sm">
-          <ThemeIcon size={36} radius="md" color="blue" variant="light">
-            <IconChecklist size={22} />
-          </ThemeIcon>
-          <div>
-            <Text fw={700} size="lg">{taskId ? 'Edit Task' : 'New Task'}</Text>
-            <Text size="xs" c="dimmed">{taskId ? 'Update details, track progress & discuss' : 'Create a new task and award to team members'}</Text>
+    <Dialog open={opened} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-[620px] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+              <CheckSquare className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle>{taskId ? 'Edit Task' : 'New Task'}</DialogTitle>
+              <DialogDescription>
+                {taskId
+                  ? 'Update details, track progress & discuss'
+                  : 'Create a new task and award to team members'}
+              </DialogDescription>
+            </div>
           </div>
-        </Group>
-      }
-      size={620}
-      radius="lg"
-      overlayProps={{ backgroundOpacity: 0.6, blur: 4 }}
-      padding="xl"
-    >
-      <Stack gap="md" mt="xs">
-        {/* Title & Description Section */}
-        <Paper p="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-          <Stack gap="sm">
-            <TextInput
-              label={
-                <Group gap={6} mb={2}>
-                  <IconFileText size={14} color="#5b8def" />
-                  <Text size="xs" fw={600}>Title</Text>
-                </Group>
-              }
-              placeholder="What needs to be done?"
-              value={title}
-              onChange={(e) => setTitle(e.currentTarget.value)}
-              required
-              variant="filled"
-              size="sm"
-            />
+        </DialogHeader>
 
-            <Textarea
-              label="Description"
-              placeholder="Add requirements, details, or notes..."
-              minRows={3}
-              value={description}
-              onChange={(e) => setDescription(e.currentTarget.value)}
-              variant="filled"
-              size="sm"
-            />
-          </Stack>
-        </Paper>
-
-        {/* Project & Multiple Assignees Section */}
-        <Paper p="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-          <Group grow gap="md" align="flex-start">
-            <Select
-              label={
-                <Group gap={6} mb={2}>
-                  <IconFolder size={14} color="#3b82f6" />
-                  <Text size="xs" fw={600}>Project</Text>
-                </Group>
-              }
-              placeholder="Select project"
-              data={projects.map((p) => ({ value: p.id, label: p.name }))}
-              value={projectId}
-              onChange={(val) => {
-                setProjectId(val);
-                const selProj = projects.find((p) => p.id === val);
-                if (selProj && selProj.visibility === 'members') {
-                  const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
-                  setAssigneeIds((prev) => prev.filter((id) => allowedIds.has(id)));
-                }
-              }}
-              clearable
-              variant="filled"
-              size="sm"
-            />
-            <MultiSelect
-              label={
-                <Group gap={6} mb={2}>
-                  <IconUser size={14} color="#10b981" />
-                  <Text size="xs" fw={600}>Awarded To / Assignees</Text>
-                </Group>
-              }
-              placeholder={assigneeIds.length === 0 ? "Select assignees" : ""}
-              data={(() => {
-                const selProj = projects.find((p) => p.id === projectId);
-                if (selProj && selProj.visibility === 'members') {
-                  const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
-                  return users
-                    .filter((u) => u.active !== false && allowedIds.has(u.id))
-                    .map((u) => ({ value: u.id, label: u.name }));
-                }
-                return users
-                  .filter((u) => u.active !== false)
-                  .map((u) => ({ value: u.id, label: u.name }));
-              })()}
-              value={assigneeIds}
-              onChange={setAssigneeIds}
-              clearable
-              searchable
-              hidePickedOptions
-              variant="filled"
-              size="sm"
-              styles={{
-                pill: {
-                  backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.35)',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                },
-                input: {
-                  minHeight: '36px',
-                  display: 'flex',
-                  alignItems: 'center',
-                },
-              }}
-            />
-          </Group>
-        </Paper>
-
-        {/* Status & Priority Selection */}
-        <Paper p="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-          <Stack gap="sm">
-            <div>
-              <Text size="xs" fw={600} mb={6} c="dimmed">STATUS</Text>
-              <SegmentedControl
-                fullWidth
-                size="xs"
-                radius="md"
-                color="blue"
-                value={status}
-                onChange={(val) => {
-                  setStatus(val);
-                  if (val === 'done') setProgress(100);
-                }}
-                data={[
-                  { label: 'To Do', value: 'todo' },
-                  { label: 'In Progress', value: 'in_progress' },
-                  { label: 'In Review', value: 'review' },
-                  { label: 'Done', value: 'done' },
-                  { label: 'Blocked', value: 'blocked' },
-                ]}
-              />
-            </div>
-
-            <div>
-              <Text size="xs" fw={600} mb={6} c="dimmed">PRIORITY</Text>
-              <SegmentedControl
-                fullWidth
-                size="xs"
-                radius="md"
-                color={priority === 'urgent' ? 'red' : priority === 'high' ? 'orange' : 'blue'}
-                value={priority}
-                onChange={setPriority}
-                data={[
-                  { label: 'Low', value: 'low' },
-                  { label: 'Normal', value: 'normal' },
-                  { label: 'High', value: 'high' },
-                  { label: 'Urgent', value: 'urgent' },
-                ]}
-              />
-            </div>
-          </Stack>
-        </Paper>
-
-        {/* Progress & Estimates Section */}
-        <Paper p="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-          <Stack gap="sm">
-            <Group justify="space-between" align="center">
-              <Group gap="xs">
-                <IconProgressCheck size={18} color="#f59e0b" />
-                <Text size="sm" fw={600}>Completion Progress</Text>
-              </Group>
-              <Badge color={progress === 100 ? 'green' : 'blue'} variant="filled" size="md">
-                {progress}%
-              </Badge>
-            </Group>
-
-            <Slider
-              value={progress}
-              onChange={setProgress}
-              step={5}
-              color="blue"
-              radius="xl"
-              size="md"
-              marks={[
-                { value: 0, label: '0%' },
-                { value: 50, label: '50%' },
-                { value: 100, label: '100%' },
-              ]}
-            />
-
-            <Group grow gap="md" mt="sm">
-              <TextInput
-                label={
-                  <Group gap={6} mb={2}>
-                    <IconCalendar size={14} color="#8b5cf6" />
-                    <Text size="xs" fw={600}>Due Date</Text>
-                  </Group>
-                }
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.currentTarget.value)}
-                variant="filled"
-                size="sm"
-              />
-              <NumberInput
-                label={
-                  <Group gap={6} mb={2}>
-                    <IconClock size={14} color="#ec4899" />
-                    <Text size="xs" fw={600}>Estimated Hours</Text>
-                  </Group>
-                }
-                value={estimateHours}
-                onChange={setEstimateHours}
-                min={0}
-                variant="filled"
-                size="sm"
-              />
-            </Group>
-          </Stack>
-        </Paper>
-
-        {/* Activity & Discussion Stream (When Editing) */}
-        {taskId && (
-          <Paper p="md" radius="md" withBorder style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-            <Divider my="xs" label="Activity & Discussion" labelPosition="center" />
-
-            <Stack gap="xs" style={{ maxHeight: 200, overflowY: 'auto' }}>
-              {comments.length === 0 ? (
-                <Text size="xs" c="dimmed" fs="italic" ta="center" py="xs">No comments yet on this task.</Text>
-              ) : (
-                comments.map((c) => {
-                  const author = users.find((u) => u.id === c.authorId);
-                  return (
-                    <Paper key={c.id} p="xs" withBorder radius="sm" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
-                      <Group gap="xs" mb={4}>
-                        <Avatar size="xs" color={author?.color || 'blue'} radius="xl">
-                          {author?.name ? author.name[0].toUpperCase() : '?'}
-                        </Avatar>
-                        <Text size="xs" fw={600}>{author?.name || 'Unknown'}</Text>
-                        <Text size="10px" c="dimmed">{new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                      </Group>
-                      <Text size="sm">{c.body}</Text>
-                    </Paper>
-                  );
-                })
-              )}
-            </Stack>
-
-            <form onSubmit={handleAddComment} style={{ marginTop: 12 }}>
-              <Group gap="xs">
-                <TextInput
-                  placeholder="Type a message or update..."
-                  style={{ flex: 1 }}
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.currentTarget.value)}
-                  variant="filled"
-                  size="sm"
+        <div className="space-y-4">
+          <Card className="bg-muted/20">
+            <CardContent className="space-y-3 pt-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                  <FileText className="h-3.5 w-3.5 text-primary" />
+                  Title
+                </Label>
+                <Input
+                  placeholder="What needs to be done?"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
                 />
-                <ActionIcon type="submit" color="blue" variant="filled" size="lg" radius="md">
-                  <IconSend size={16} />
-                </ActionIcon>
-              </Group>
-            </form>
-          </Paper>
-        )}
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  placeholder="Add requirements, details, or notes..."
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Modal Action Buttons */}
-        <Group justify="space-between" mt="sm">
-          {taskId ? (
-            <Button color="red" variant="light" leftSection={<IconTrash size={16} />} onClick={handleDelete} radius="md">
-              Delete
-            </Button>
-          ) : <div />}
+          <Card className="bg-muted/20">
+            <CardContent className="grid gap-4 pt-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Folder className="h-3.5 w-3.5 text-blue-500" />
+                  Project
+                </Label>
+                <Select
+                  value={projectId || '__none__'}
+                  onValueChange={(val) => {
+                    const nextId = val === '__none__' ? null : val;
+                    setProjectId(nextId);
+                    const selProj = projects.find((p) => p.id === nextId);
+                    if (selProj && selProj.visibility === 'members') {
+                      const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
+                      setAssigneeIds((prev) => prev.filter((id) => allowedIds.has(id)));
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                  <User className="h-3.5 w-3.5 text-emerald-500" />
+                  Awarded To / Assignees
+                </Label>
+                <MultiSelect
+                  options={assigneeOptions}
+                  value={assigneeIds}
+                  onChange={setAssigneeIds}
+                  placeholder="Select assignees"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-          <Group gap="xs">
-            <Button variant="subtle" color="gray" onClick={onClose} radius="md">
-              Cancel
-            </Button>
-            <Button
-              color="blue"
-              onClick={handleSave}
-              loading={submitting}
-              radius="md"
-              leftSection={taskId ? <IconProgressCheck size={16} /> : <IconPlus size={16} />}
-              size="sm"
-            >
-              {taskId ? 'Save Changes' : 'Create Task'}
-            </Button>
-          </Group>
-        </Group>
-      </Stack>
-    </Modal>
+          <Card className="bg-muted/20">
+            <CardContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Status</Label>
+                <SegmentedControl
+                  value={status}
+                  onChange={(val) => {
+                    setStatus(val);
+                    if (val === 'done') setProgress(100);
+                  }}
+                  options={[
+                    { label: 'To Do', value: 'todo' },
+                    { label: 'In Progress', value: 'in_progress' },
+                    { label: 'In Review', value: 'review' },
+                    { label: 'Done', value: 'done' },
+                    { label: 'Blocked', value: 'blocked' },
+                  ]}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Priority</Label>
+                <SegmentedControl
+                  value={priority}
+                  onChange={setPriority}
+                  activeClassName={
+                    priority === 'urgent'
+                      ? 'text-red-500'
+                      : priority === 'high'
+                        ? 'text-orange-500'
+                        : undefined
+                  }
+                  options={[
+                    { label: 'Low', value: 'low' },
+                    { label: 'Normal', value: 'normal' },
+                    { label: 'High', value: 'high' },
+                    { label: 'Urgent', value: 'urgent' },
+                  ]}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-muted/20">
+            <CardContent className="space-y-4 pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ListChecks className="h-4 w-4 text-amber-500" />
+                  <span className="text-sm font-semibold">Completion Progress</span>
+                </div>
+                <Badge variant={progress === 100 ? 'default' : 'secondary'}>{progress}%</Badge>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={progress}
+                onChange={(e) => setProgress(Number(e.target.value))}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                    <Calendar className="h-3.5 w-3.5 text-violet-500" />
+                    Due Date
+                  </Label>
+                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                    <Clock className="h-3.5 w-3.5 text-pink-500" />
+                    Estimated Hours
+                  </Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={estimateHours}
+                    onChange={(e) => setEstimateHours(Number(e.target.value) || 0)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {taskId && (
+            <Card className="bg-muted/20">
+              <CardContent className="space-y-3 pt-4">
+                <Separator />
+                <p className="text-center text-xs font-medium text-muted-foreground">Activity & Discussion</p>
+                <ScrollArea className="max-h-[200px]">
+                  <div className="space-y-2 pr-3">
+                    {comments.length === 0 ? (
+                      <p className="py-2 text-center text-xs italic text-muted-foreground">
+                        No comments yet on this task.
+                      </p>
+                    ) : (
+                      comments.map((c) => {
+                        const author = users.find((u) => u.id === c.authorId);
+                        return (
+                          <div key={c.id} className="rounded-md border bg-muted/30 p-2">
+                            <div className="mb-1 flex items-center gap-2">
+                              <Avatar className="h-5 w-5">
+                                <AvatarFallback
+                                  className="text-[10px] text-white"
+                                  style={{ backgroundColor: getAvatarBg(author?.color) }}
+                                >
+                                  {author?.name ? author.name[0].toUpperCase() : '?'}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs font-semibold">{author?.name || 'Unknown'}</span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {new Date(c.createdAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-sm">{c.body}</p>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+                <form onSubmit={handleAddComment} className="flex gap-2">
+                  <Input
+                    placeholder="Type a message or update..."
+                    className="flex-1"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                  />
+                  <Button type="submit" size="icon">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            {taskId ? (
+              <Button variant="destructive" size="sm" className="bg-destructive/15 text-destructive hover:bg-destructive/25" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={submitting} size="sm">
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : taskId ? (
+                  <ListChecks className="h-4 w-4" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {taskId ? 'Save Changes' : 'Create Task'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

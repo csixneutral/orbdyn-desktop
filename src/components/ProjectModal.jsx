@@ -1,410 +1,337 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
-  Modal,
-  TextInput,
-  Textarea,
-  Select,
-  MultiSelect,
-  ColorInput,
-  Button,
-  Group,
-  Stack,
-  Text,
-  ThemeIcon,
-  Paper,
-  SegmentedControl,
-  ActionIcon,
-} from "@mantine/core";
-import { notifications } from "@mantine/notifications";
+  Folder,
+  Trash2,
+  Pencil,
+  Plus,
+  User,
+  Calendar,
+  Check,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
 import {
-  IconFolder,
-  IconTrash,
-  IconPencil,
-  IconPlus,
-  IconUser,
-  IconCalendar,
-  IconCheck,
-  IconAlertTriangle,
-} from "@tabler/icons-react";
-import { api } from "../api";
-import { useData } from "../context/DataContext";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { cn } from '@/lib/utils';
+import { showNotification } from '@/lib/notify';
+import { api } from '../api';
+import { useData } from '../context/DataContext';
+
+const PRESET_COLORS = ['#3d7fe0', '#5b8def', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+function SegmentedControl({ value, onChange, options }) {
+  return (
+    <div className="flex rounded-md border bg-muted/40 p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={cn(
+            'flex-1 rounded-sm px-2 py-1.5 text-xs font-medium transition-colors',
+            value === opt.value
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ProjectModal({ project, opened, onClose }) {
   const { users, refresh } = useData();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [client, setClient] = useState("");
-  const [colour, setColour] = useState("#3d7fe0");
-  const [visibility, setVisibility] = useState("everyone");
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [client, setClient] = useState('');
+  const [colour, setColour] = useState('#3d7fe0');
+  const [visibility, setVisibility] = useState('everyone');
   const [memberIds, setMemberIds] = useState([]);
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleteConfirmOpened, setDeleteConfirmOpened] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (project) {
-      setName(project.name || "");
-      setDescription(project.description || "");
-      setClient(project.client || "");
-      setColour(project.colour || "#3d7fe0");
-      setVisibility(project.visibility || "everyone");
+      setName(project.name || '');
+      setDescription(project.description || '');
+      setClient(project.client || '');
+      setColour(project.colour || '#3d7fe0');
+      setVisibility(project.visibility || 'everyone');
       setMemberIds(project.memberIds || []);
-      setDueDate(project.dueDate || "");
+      setDueDate(project.dueDate || '');
     } else {
-      setName("");
-      setDescription("");
-      setClient("");
-      setColour("#3d7fe0");
-      setVisibility("everyone");
+      setName('');
+      setDescription('');
+      setClient('');
+      setColour('#3d7fe0');
+      setVisibility('everyone');
       setMemberIds([]);
-      setDueDate("");
+      setDueDate('');
     }
   }, [project, opened]);
 
   const handleSave = async () => {
     if (!name.trim()) {
-      notifications.show({
-        title: "Error",
-        message: "Project name is required",
-        color: "red",
-      });
+      showNotification({ title: 'Error', message: 'Project name is required', color: 'red' });
       return;
     }
     try {
       setSubmitting(true);
-      const payload = {
-        name,
-        description,
-        client,
-        colour,
-        visibility,
-        memberIds,
-        dueDate,
-      };
+      const payload = { name, description, client, colour, visibility, memberIds, dueDate };
 
       if (project?.id) {
         await api.updateProject(project.id, payload);
-        notifications.show({
-          title: "Success",
-          message: "Project updated",
-          color: "green",
-        });
+        showNotification({ title: 'Success', message: 'Project updated', color: 'green' });
       } else {
         await api.createProject(payload);
-        notifications.show({
-          title: "Success",
-          message: "Project created",
-          color: "green",
-        });
+        showNotification({ title: 'Success', message: 'Project created', color: 'green' });
       }
       refresh();
       onClose();
     } catch (err) {
-      notifications.show({
-        title: "Error",
-        message: err.message,
-        color: "red",
-      });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setSubmitting(false);
     }
   };
-
-  const [deleteConfirmOpened, setDeleteConfirmOpened] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const handleConfirmDelete = async () => {
     if (!project?.id) return;
     try {
       setDeleting(true);
       await api.deleteProject(project.id);
-      notifications.show({
-        title: "Moved to Recycle Bin",
+      showNotification({
+        title: 'Moved to Recycle Bin',
         message: `"${project.name}" was moved to the Recycle Bin.`,
-        color: "blue",
+        color: 'blue',
       });
       setDeleteConfirmOpened(false);
       onClose();
       refresh();
     } catch (err) {
-      notifications.show({
-        title: "Error",
-        message: err.message,
-        color: "red",
-      });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <Modal
-      centered
-      opened={opened}
-      onClose={onClose}
-      title={
-        <Group gap="sm">
-          <ThemeIcon size={36} radius="md" color="blue" variant="light">
-            <IconFolder size={22} />
-          </ThemeIcon>
-          <div>
-            <Text fw={700} size="lg">
-              {project ? "Edit Project" : "New Project"}
-            </Text>
-            <Text size="xs" c="dimmed">
-              {project
-                ? "Modify details and member access"
-                : "Organize tasks and shared documents"}
-            </Text>
+    <>
+      <Dialog open={opened} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className="max-h-[90vh] max-w-[620px] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+                <Folder className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle>{project ? 'Edit Project' : 'New Project'}</DialogTitle>
+                <DialogDescription>
+                  {project
+                    ? 'Modify details and member access'
+                    : 'Organize tasks and shared documents'}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <Card className="bg-muted/20">
+              <CardContent className="space-y-3 pt-4">
+                <div className="space-y-2">
+                  <Label>Project Name</Label>
+                  <Input
+                    placeholder="e.g. Website Redesign"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    placeholder="What is this project about?"
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/20">
+              <CardContent className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label>Client Name</Label>
+                  <Input
+                    placeholder="e.g. Internal / Acme Corp"
+                    value={client}
+                    onChange={(e) => setClient(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                    Project Color Accent
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map((hex) => (
+                      <button
+                        key={hex}
+                        type="button"
+                        className={cn(
+                          'flex h-9 w-9 items-center justify-center rounded-full border transition-shadow',
+                          colour.toLowerCase() === hex.toLowerCase()
+                            ? 'border-white shadow-[0_0_8px_var(--tw-shadow-color)]'
+                            : 'border-white/10'
+                        )}
+                        style={{ backgroundColor: hex, '--tw-shadow-color': hex }}
+                        onClick={() => setColour(hex)}
+                      >
+                        {colour.toLowerCase() === hex.toLowerCase() && (
+                          <Check className="h-4 w-4 text-white" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Custom Color Hex</Label>
+                    <Input
+                      placeholder="Or custom hex code e.g. #3d7fe0"
+                      value={colour}
+                      onChange={(e) => setColour(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/20">
+              <CardContent className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                    Visibility Permissions
+                  </Label>
+                  <SegmentedControl
+                    value={visibility}
+                    onChange={setVisibility}
+                    options={[
+                      { label: 'Everyone in Workspace', value: 'everyone' },
+                      { label: 'Team Members Only', value: 'members' },
+                    ]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-violet-500" />
+                    Target Due Date
+                  </Label>
+                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                      <User className="h-3.5 w-3.5 text-emerald-500" />
+                      Team Members
+                    </Label>
+                    <span className="text-[10px] text-muted-foreground">
+                      Project Owner is automatically included
+                    </span>
+                  </div>
+                  <MultiSelect
+                    options={users.map((u) => ({ value: u.id, label: u.name }))}
+                    value={memberIds}
+                    onChange={setMemberIds}
+                    placeholder="Select additional team members"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center justify-between pt-2">
+              {project?.id ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="bg-destructive/15 text-destructive hover:bg-destructive/25"
+                  onClick={() => setDeleteConfirmOpened(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+              ) : (
+                <div />
+              )}
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={submitting} size="sm">
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : project ? (
+                    <Pencil className="h-4 w-4" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  {project ? 'Save Changes' : 'Create Project'}
+                </Button>
+              </div>
+            </div>
           </div>
-        </Group>
-      }
-      size={620}
-      radius="lg"
-      overlayProps={{ backgroundOpacity: 0.6, blur: 4 }}
-      padding="xl"
-    >
-      <Stack gap="md" mt="xs">
-        <Paper
-          p="md"
-          radius="md"
-          withBorder
-          style={{ backgroundColor: "rgba(255, 255, 255, 0.02)" }}
-        >
-          <Stack gap="sm">
-            <TextInput
-              label="Project Name"
-              placeholder="e.g. Website Redesign"
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-              required
-              variant="filled"
-              size="sm"
-            />
+        </DialogContent>
+      </Dialog>
 
-            <Textarea
-              label="Description"
-              placeholder="What is this project about?"
-              minRows={2}
-              value={description}
-              onChange={(e) => setDescription(e.currentTarget.value)}
-              variant="filled"
-              size="sm"
-            />
-          </Stack>
-        </Paper>
-
-        <Paper
-          p="md"
-          radius="md"
-          withBorder
-          style={{ backgroundColor: "rgba(255, 255, 255, 0.02)" }}
-        >
-          <Stack gap="sm">
-            <TextInput
-              label="Client Name"
-              placeholder="e.g. Internal / Acme Corp"
-              value={client}
-              onChange={(e) => setClient(e.currentTarget.value)}
-              variant="filled"
-              size="sm"
-            />
-
-            <div>
-              <Text size="xs" fw={600} mb={6} c="dimmed">
-                PROJECT COLOR ACCENT
-              </Text>
-              <Group gap="xs" mb="xs">
-                {[
-                  "#3d7fe0",
-                  "#5b8def",
-                  "#10b981",
-                  "#f59e0b",
-                  "#ef4444",
-                  "#8b5cf6",
-                  "#ec4899",
-                ].map((hex) => (
-                  <ActionIcon
-                    key={hex}
-                    size="lg"
-                    radius="xl"
-                    style={{
-                      backgroundColor: hex,
-                      border:
-                        colour.toLowerCase() === hex.toLowerCase()
-                          ? "2.5px solid white"
-                          : "1px solid rgba(255, 255, 255, 0.1)",
-                      boxShadow:
-                        colour.toLowerCase() === hex.toLowerCase()
-                          ? `0 0 8px ${hex}`
-                          : "none",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => setColour(hex)}
-                  >
-                    {colour.toLowerCase() === hex.toLowerCase() && (
-                      <IconCheck size={16} color="white" />
-                    )}
-                  </ActionIcon>
-                ))}
-              </Group>
-
-              <ColorInput
-                label="Custom Color Hex"
-                placeholder="Or custom hex code e.g. #3d7fe0"
-                value={colour}
-                onChange={setColour}
-                format="hex"
-                variant="filled"
-                size="sm"
-                swatches={[
-                  "#3d7fe0",
-                  "#5b8def",
-                  "#10b981",
-                  "#f59e0b",
-                  "#ef4444",
-                  "#8b5cf6",
-                  "#ec4899",
-                ]}
-              />
-            </div>
-          </Stack>
-        </Paper>
-
-        <Paper
-          p="md"
-          radius="md"
-          withBorder
-          style={{ backgroundColor: "rgba(255, 255, 255, 0.02)" }}
-        >
-          <Stack gap="sm">
-            <div>
-              <Text size="xs" fw={600} mb={6} c="dimmed">
-                VISIBILITY PERMISSIONS
-              </Text>
-              <SegmentedControl
-                fullWidth
-                size="xs"
-                radius="md"
-                color="blue"
-                value={visibility}
-                onChange={setVisibility}
-                data={[
-                  { label: "Everyone in Workspace", value: "everyone" },
-                  { label: "Team Members Only", value: "members" },
-                ]}
-              />
-            </div>
-
-            <TextInput
-              label="Target Due Date"
-              type="date"
-              leftSection={<IconCalendar size={16} color="#8b5cf6" />}
-              value={dueDate}
-              onChange={(e) => setDueDate(e.currentTarget.value)}
-              variant="filled"
-              size="sm"
-            />
-
-            <div>
-              <Group justify="space-between" mb={2}>
-                <Group gap={6}>
-                  <IconUser size={14} color="#10b981" />
-                  <Text size="xs" fw={600}>
-                    Team Members
-                  </Text>
-                </Group>
-                <Text size="10px" c="dimmed">
-                  Project Owner is automatically included
-                </Text>
-              </Group>
-              <MultiSelect
-                data={users.map((u) => ({ value: u.id, label: u.name }))}
-                value={memberIds}
-                onChange={setMemberIds}
-                placeholder="Select additional team members"
-                searchable
-                clearable
-                hidePickedOptions
-                variant="filled"
-                size="sm"
-                styles={{
-                  pill: {
-                    backgroundColor: "rgba(16, 185, 129, 0.18)",
-                    color: "#34d399",
-                    border: "1px solid rgba(16, 185, 129, 0.35)",
-                    fontWeight: 600,
-                  },
-                }}
-              />
-            </div>
-          </Stack>
-        </Paper>
-
-        <Group justify="space-between" mt="sm">
-          {project?.id ? (
-            <Button
-              color="red"
-              variant="light"
-              leftSection={<IconTrash size={16} />}
-              onClick={() => setDeleteConfirmOpened(true)}
-              radius="md"
+      <AlertDialog open={deleteConfirmOpened} onOpenChange={setDeleteConfirmOpened}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete Project?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>&quot;{project?.name}&quot;</strong>? It will be
+              moved to the Recycle Bin where you can restore it or delete it permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+              onClick={handleConfirmDelete}
             >
-              Delete
-            </Button>
-          ) : (
-            <div />
-          )}
-
-          <Group gap="xs">
-            <Button variant="subtle" color="gray" onClick={onClose} radius="md">
-              Cancel
-            </Button>
-            <Button
-              color="blue"
-              onClick={handleSave}
-              loading={submitting}
-              radius="md"
-              leftSection={
-                project ? <IconPencil size={16} /> : <IconPlus size={16} />
-              }
-              size="sm"
-            >
-              {project ? "Save Changes" : "Create Project"}
-            </Button>
-          </Group>
-        </Group>
-      </Stack>
-
-      {/* Delete Project Confirmation Modal */}
-      <Modal
-        centered
-        opened={deleteConfirmOpened}
-        onClose={() => setDeleteConfirmOpened(false)}
-        title={
-          <Group gap="xs">
-            <IconAlertTriangle size={20} color="#ef4444" />
-            <Text fw={700}>Delete Project?</Text>
-          </Group>
-        }
-        size={520}
-        radius="lg"
-      >
-        <Stack gap="md">
-          <Text size="sm">
-            Are you sure you want to delete <strong>"{project?.name}"</strong>? It will be moved to the Recycle Bin where you can restore it or delete it permanently.
-          </Text>
-
-          <Group justify="flex-end" gap="sm">
-            <Button variant="default" onClick={() => setDeleteConfirmOpened(false)}>
-              Cancel
-            </Button>
-            <Button color="red" loading={deleting} onClick={handleConfirmDelete}>
+              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
               Delete Project
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-    </Modal>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

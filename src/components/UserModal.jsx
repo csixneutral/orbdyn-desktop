@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { User, Loader2 } from 'lucide-react';
 import {
-  Modal,
-  TextInput,
-  PasswordInput,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { PasswordInput } from '@/components/ui/password-input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import {
   Select,
-  Switch,
-  Button,
-  Group,
-  Stack,
-  Text,
-  ThemeIcon,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { IconUser } from '@tabler/icons-react';
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 
@@ -47,11 +54,15 @@ export function UserModal({ editUser, opened, onClose }) {
 
   const handleSave = async () => {
     if (!name.trim() || !username.trim()) {
-      notifications.show({ title: 'Error', message: 'Name and Username are required', color: 'red' });
+      showNotification({ title: 'Error', message: 'Name and Username are required', color: 'red' });
       return;
     }
     if (!editUser && (!password || password.length < 6)) {
-      notifications.show({ title: 'Error', message: 'Password must be at least 6 characters', color: 'red' });
+      showNotification({
+        title: 'Error',
+        message: 'Password must be at least 6 characters',
+        color: 'red',
+      });
       return;
     }
     try {
@@ -60,101 +71,111 @@ export function UserModal({ editUser, opened, onClose }) {
         const payload = { name, role, email, active };
         if (password) payload.password = password;
         await api.updateUser(editUser.id, payload);
-        notifications.show({ title: 'Success', message: 'Person updated', color: 'green' });
+        showNotification({ title: 'Success', message: 'Person updated', color: 'green' });
       } else {
         await api.createUser({ name, username, email, password, role });
-        notifications.show({ title: 'Success', message: 'Person added to workspace', color: 'green' });
+        showNotification({ title: 'Success', message: 'Person added to workspace', color: 'green' });
       }
       refresh();
       onClose();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal
-      centered
-      opened={opened}
-      onClose={onClose}
-      title={
-        <Group gap="sm">
-          <ThemeIcon size={36} radius="md" color="blue" variant="light">
-            <IconUser size={22} />
-          </ThemeIcon>
-          <div>
-            <Text fw={700} size="lg">{editUser ? 'Edit Person' : 'Add Person'}</Text>
-            <Text size="xs" c="dimmed">Manage workspace member roles and access</Text>
+    <Dialog open={opened} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-[620px]">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle>{editUser ? 'Edit Person' : 'Add Person'}</DialogTitle>
+              <DialogDescription>Manage workspace member roles and access</DialogDescription>
+            </div>
           </div>
-        </Group>
-      }
-      size={620}
-      radius="lg"
-      overlayProps={{ backgroundOpacity: 0.6, blur: 4 }}
-      padding="xl"
-    >
-      <Stack spacing="md">
-        <TextInput
-          label="Full Name"
-          placeholder="e.g. Sarah Jenkins"
-          value={name}
-          onChange={(e) => setName(e.currentTarget.value)}
-          required
-        />
+        </DialogHeader>
 
-        <Group grow>
-          <TextInput
-            label="Username"
-            placeholder="e.g. sjenkins"
-            value={username}
-            onChange={(e) => setUsername(e.currentTarget.value)}
-            disabled={!!editUser}
-            required
-          />
-          <TextInput
-            label="Email (Optional)"
-            placeholder="sarah@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.currentTarget.value)}
-          />
-        </Group>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Full Name</Label>
+            <Input
+              placeholder="e.g. Sarah Jenkins"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
 
-        <PasswordInput
-          label={editUser ? 'New Password (leave blank to keep current)' : 'Starting Password'}
-          placeholder="At least 6 characters"
-          value={password}
-          onChange={(e) => setPassword(e.currentTarget.value)}
-          required={!editUser}
-        />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Username</Label>
+              <Input
+                placeholder="e.g. sjenkins"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={!!editUser}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email (Optional)</Label>
+              <Input
+                placeholder="sarah@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          </div>
 
-        <Select
-          label="Role & Permissions"
-          data={[
-            { value: 'admin', label: 'Administrator (Full Access)' },
-            { value: 'member', label: 'Member (Create & Edit Work)' },
-            { value: 'viewer', label: 'Viewer (Read-only)' },
-          ]}
-          value={role}
-          onChange={setRole}
-        />
+          <div className="space-y-2">
+            <Label>
+              {editUser ? 'New Password (leave blank to keep current)' : 'Starting Password'}
+            </Label>
+            <PasswordInput
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required={!editUser}
+            />
+          </div>
 
-        {editUser && (
-          <Switch
-            label="Account Active"
-            checked={active}
-            onChange={(e) => setActive(e.currentTarget.checked)}
-          />
-        )}
+          <div className="space-y-2">
+            <Label>Role & Permissions</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrator (Full Access)</SelectItem>
+                <SelectItem value="member">Member (Create & Edit Work)</SelectItem>
+                <SelectItem value="viewer">Viewer (Read-only)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Group position="right" mt="md">
-          <Button variant="default" onClick={onClose}>Cancel</Button>
-          <Button color="blue" onClick={handleSave} loading={submitting}>
-            {editUser ? 'Save Changes' : 'Add Person'}
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
+          {editUser && (
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <Label htmlFor="active-switch">Account Active</Label>
+              <Switch id="active-switch" checked={active} onCheckedChange={setActive} />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={submitting}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editUser ? 'Save Changes' : 'Add Person'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

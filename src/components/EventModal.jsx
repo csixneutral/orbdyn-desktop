@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { Calendar, Trash2, Loader2 } from 'lucide-react';
 import {
-  Modal,
-  TextInput,
-  Textarea,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
   Select,
-  MultiSelect,
-  Button,
-  Group,
-  Stack,
-  Text,
-  Checkbox,
-  ThemeIcon,
-} from '@mantine/core';
-import { notifications } from '@mantine/notifications';
-import { IconCalendar, IconPlus, IconTrash, IconClock, IconMapPin } from '@tabler/icons-react';
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 
-export function EventModal({ eventItem, opened, onClose }) {
+export function EventModal({ eventItem, opened, onClose, defaultProjectId }) {
   const { projects, users, refresh } = useData();
 
   const [title, setTitle] = useState('');
@@ -55,21 +62,25 @@ export function EventModal({ eventItem, opened, onClose }) {
       setAllDay(false);
       setLocation('');
       setNotes('');
-      setProjectId(null);
+      setProjectId(defaultProjectId || null);
       setAttendeeIds([]);
       setKind('meeting');
     }
-  }, [eventItem, opened]);
+  }, [eventItem, opened, defaultProjectId]);
 
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const handleSave = async () => {
     if (!title.trim() || !date) {
-      notifications.show({ title: 'Validation', message: 'Title and Date are required', color: 'red' });
+      showNotification({ title: 'Validation', message: 'Title and Date are required', color: 'red' });
       return;
     }
     if (!eventItem?.id && date < todayStr) {
-      notifications.show({ title: 'Invalid Date', message: 'New events cannot be scheduled on past dates.', color: 'red' });
+      showNotification({
+        title: 'Invalid Date',
+        message: 'New events cannot be scheduled on past dates.',
+        color: 'red',
+      });
       return;
     }
     try {
@@ -90,15 +101,15 @@ export function EventModal({ eventItem, opened, onClose }) {
 
       if (eventItem?.id) {
         await api.updateEvent(eventItem.id, payload);
-        notifications.show({ title: 'Updated', message: 'Event details updated', color: 'green' });
+        showNotification({ title: 'Updated', message: 'Event details updated', color: 'green' });
       } else {
         await api.createEvent(payload);
-        notifications.show({ title: 'Scheduled', message: 'New event added to calendar', color: 'green' });
+        showNotification({ title: 'Scheduled', message: 'New event added to calendar', color: 'green' });
       }
       refresh();
       onClose();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     } finally {
       setSubmitting(false);
     }
@@ -108,145 +119,172 @@ export function EventModal({ eventItem, opened, onClose }) {
     if (!eventItem?.id) return;
     try {
       await api.deleteEvent(eventItem.id);
-      notifications.show({ title: 'Deleted', message: 'Event removed from calendar', color: 'blue' });
+      showNotification({ title: 'Deleted', message: 'Event removed from calendar', color: 'blue' });
       refresh();
       onClose();
     } catch (err) {
-      notifications.show({ title: 'Error', message: err.message, color: 'red' });
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
     }
   };
 
   return (
-    <Modal
-      centered
-      opened={opened}
-      onClose={onClose}
-      title={
-        <Group gap="sm">
-          <ThemeIcon size={36} radius="md" color="blue" variant="light">
-            <IconCalendar size={22} />
-          </ThemeIcon>
-          <div>
-            <Text fw={700} size="lg">{eventItem?.id ? 'Edit Event' : 'Schedule Event'}</Text>
-            <Text size="xs" c="dimmed">Add meetings, reminders, or project milestones</Text>
+    <Dialog open={opened} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-[620px] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle>{eventItem?.id ? 'Edit Event' : 'Schedule Event'}</DialogTitle>
+              <DialogDescription>Add meetings, reminders, or project milestones</DialogDescription>
+            </div>
           </div>
-        </Group>
-      }
-      size={620}
-      radius="lg"
-    >
-      <Stack gap="md" mt="xs">
-        <TextInput
-          label="Event Title"
-          placeholder="e.g. Sprint Planning, Client Sync..."
-          value={title}
-          onChange={(e) => setTitle(e.currentTarget.value)}
-          required
-        />
+        </DialogHeader>
 
-        <Group grow gap="md">
-          <Select
-            label="Type"
-            data={[
-              { value: 'meeting', label: 'Meeting' },
-              { value: 'milestone', label: 'Milestone' },
-              { value: 'deadline', label: 'Deadline' },
-              { value: 'reminder', label: 'Reminder' },
-            ]}
-            value={kind}
-            onChange={setKind}
-          />
-          <Select
-            label="Associated Project"
-            placeholder="None"
-            data={projects.map((p) => ({ value: p.id, label: p.name }))}
-            value={projectId}
-            onChange={setProjectId}
-            clearable
-          />
-        </Group>
-
-        <Group grow gap="md">
-          <TextInput
-            label="Start Date"
-            type="date"
-            min={eventItem?.id ? undefined : todayStr}
-            value={date}
-            onChange={(e) => setDate(e.currentTarget.value)}
-            required
-          />
-          <TextInput
-            label="End Date"
-            type="date"
-            min={date || todayStr}
-            value={endDate}
-            onChange={(e) => setEndDate(e.currentTarget.value)}
-          />
-        </Group>
-
-        <Checkbox
-          label="All Day Event"
-          checked={allDay}
-          onChange={(e) => setAllDay(e.currentTarget.checked)}
-        />
-
-        {!allDay && (
-          <Group grow gap="md">
-            <TextInput
-              label="Start Time"
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.currentTarget.value)}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Event Title</Label>
+            <Input
+              placeholder="e.g. Sprint Planning, Client Sync..."
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
             />
-            <TextInput
-              label="End Time"
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.currentTarget.value)}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={kind} onValueChange={setKind}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="meeting">Meeting</SelectItem>
+                  <SelectItem value="milestone">Milestone</SelectItem>
+                  <SelectItem value="deadline">Deadline</SelectItem>
+                  <SelectItem value="reminder">Reminder</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Associated Project</Label>
+              <Select
+                value={projectId || '__none__'}
+                onValueChange={(val) => setProjectId(val === '__none__' ? null : val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="None" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                min={eventItem?.id ? undefined : todayStr}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                min={date || todayStr}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="all-day"
+              checked={allDay}
+              onCheckedChange={(checked) => setAllDay(!!checked)}
             />
-          </Group>
-        )}
+            <Label htmlFor="all-day" className="cursor-pointer font-normal">
+              All Day Event
+            </Label>
+          </div>
 
-        <TextInput
-          label="Location / Meeting Link"
-          placeholder="e.g. Conference Room A, or https://meet..."
-          value={location}
-          onChange={(e) => setLocation(e.currentTarget.value)}
-        />
+          {!allDay && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              </div>
+            </div>
+          )}
 
-        <MultiSelect
-          label="Invite Attendees"
-          data={users.map((u) => ({ value: u.id, label: u.name }))}
-          value={attendeeIds}
-          onChange={setAttendeeIds}
-          placeholder="Select who is invited"
-          searchable
-          clearable
-        />
+          <div className="space-y-2">
+            <Label>Location / Meeting Link</Label>
+            <Input
+              placeholder="e.g. Conference Room A, or https://meet..."
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
+          </div>
 
-        <Textarea
-          label="Notes / Agenda"
-          placeholder="Add agenda or details..."
-          minRows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.currentTarget.value)}
-        />
+          <div className="space-y-2">
+            <Label>Invite Attendees</Label>
+            <MultiSelect
+              options={users.map((u) => ({ value: u.id, label: u.name }))}
+              value={attendeeIds}
+              onChange={setAttendeeIds}
+              placeholder="Select who is invited"
+            />
+          </div>
 
-        <Group justify="space-between" mt="md">
-          {eventItem?.id ? (
-            <Button color="red" variant="subtle" leftSection={<IconTrash size={16} />} onClick={handleDelete}>
-              Delete Event
-            </Button>
-          ) : <div />}
+          <div className="space-y-2">
+            <Label>Notes / Agenda</Label>
+            <Textarea
+              placeholder="Add agenda or details..."
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
 
-          <Group gap="xs">
-            <Button variant="default" onClick={onClose}>Cancel</Button>
-            <Button color="blue" onClick={handleSave} loading={submitting}>
-              {eventItem?.id ? 'Save Changes' : 'Schedule Event'}
-            </Button>
-          </Group>
-        </Group>
-      </Stack>
-    </Modal>
+          <div className="flex items-center justify-between pt-2">
+            {eventItem?.id ? (
+              <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={handleDelete}>
+                <Trash2 className="h-4 w-4" />
+                Delete Event
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={submitting}>
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {eventItem?.id ? 'Save Changes' : 'Schedule Event'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

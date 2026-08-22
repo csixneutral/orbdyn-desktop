@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
-import { notifications } from '@mantine/notifications';
+import { showNotification } from '@/lib/notify';
 
 const DataContext = createContext(null);
 
@@ -18,7 +19,7 @@ export function DataProvider({ children }) {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [notificationList, setNotificationList] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
-  const [shareStatus, setShareStatus] = useState({ online: false, url: null, lan: [], port: 4380 });
+  const [shareStatus, setShareStatus] = useState({ online: true, url: null, lan: [], port: null, cloud: true });
   const [loading, setLoading] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -59,47 +60,54 @@ export function DataProvider({ children }) {
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      fetchAll();
-    }
+    if (user) fetchAll();
   }, [user, fetchAll]);
 
-  // Subscribe to Server-Sent Events for real-time live updates
   useEffect(() => {
-    if (!user) return;
-    let es;
-    try {
-      es = new EventSource('/api/stream');
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'notification') {
-            notifications.show({
-              title: data.title || 'Orbdyn',
-              message: data.body || '',
-              color: 'blue',
-            });
-            // Electron native OS notification trigger
-            if (window.orbdyn?.notify) {
-              window.orbdyn.notify(data.title, data.body);
-            }
-            fetchAll();
-          } else {
-            fetchAll();
-          }
-        } catch (_) {}
-      };
-      es.onerror = () => {
-        es && es.close();
-      };
-    } catch (e) {
-      console.error('SSE Error', e);
-    }
+    if (!user?.id) return;
+
+    const tables = [
+      'profiles',
+      'projects',
+      'tasks',
+      'comments',
+      'files',
+      'events',
+      'activity_log',
+      'trash_items',
+    ];
+
+    const channel = supabase.channel(`orbdyn-${user.id}`);
+
+    channel.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+      (payload) => {
+        const row = payload.new;
+        showNotification({
+          title: row.title || 'Orbdyn',
+          message: row.body || '',
+          color: 'blue',
+        });
+        if (window.orbdyn?.notify) {
+          window.orbdyn.notify(row.title, row.body);
+        }
+        fetchAll();
+      }
+    );
+
+    tables.forEach((table) => {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
+        fetchAll();
+      });
+    });
+
+    channel.subscribe();
 
     return () => {
-      if (es) es.close();
+      supabase.removeChannel(channel);
     };
-  }, [user, fetchAll]);
+  }, [user?.id, fetchAll]);
 
   return (
     <DataContext.Provider

@@ -35,14 +35,5 @@ if not exist "node_modules\electron" (
   )
 )
 
-echo   Building the latest Orbdyn screen...
-call npm run build:ui
-if errorlevel 1 (
-  echo.
-  echo   The screen could not be built. Check the messages above and try again.
-  pause
-  exit /b
-)
-
 echo   Starting Orbdyn...
 call npm start

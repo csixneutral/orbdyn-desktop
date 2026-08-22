@@ -1,67 +1,50 @@
 import React, { useState } from 'react';
 import {
-  Paper,
-  Text,
-  Title,
-  Group,
-  Badge,
-  Button,
-  Stack,
-  ActionIcon,
-  Tooltip,
-  SimpleGrid,
-  Box,
-} from '@mantine/core';
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ListChecks,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
-  IconPlus,
-  IconChevronLeft,
-  IconChevronRight,
-  IconCalendar,
-  IconClock,
-  IconMapPin,
-  IconChecklist,
-} from '@tabler/icons-react';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { showNotification } from '@/lib/notify.js';
+import { getTintStyle, isHexColor } from '@/lib/colors';
+import { cn } from '@/lib/utils';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { notifications } from '@mantine/notifications';
 import { EventModal } from '../components/EventModal';
 
 const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-export function CalendarView() {
+export function CalendarView({ projectId }) {
   const { user } = useAuth();
   const { events, tasks, projects } = useData();
 
-  // Current view date state (defaults to today or target month)
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [selectedDateForNew, setSelectedDateForNew] = useState(null);
 
   const year = currentDate.getFullYear();
-  const month = currentDate.getMonth(); // 0 - 11
+  const month = currentDate.getMonth();
 
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
-  // Helper navigation
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
-  };
-
-  const handleToday = () => {
-    setCurrentDate(new Date());
-  };
+  const handlePrevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const handleToday = () => setCurrentDate(new Date());
 
   const handleOpenCreate = (dateStr) => {
     setSelectedEvent(dateStr ? { date: dateStr } : null);
-    setSelectedDateForNew(dateStr || null);
     setModalOpened(true);
   };
 
@@ -73,19 +56,16 @@ export function CalendarView() {
     }
   };
 
-  // Build grid days for the month (ISO Monday start)
   const getCalendarDays = () => {
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
 
-    // Monday-based day index (0 = Mon, 6 = Sun)
     let startDayOfWeek = firstDayOfMonth.getDay() - 1;
     if (startDayOfWeek === -1) startDayOfWeek = 6;
 
     const days = [];
-
-    // Previous month padding days
     const prevMonthLastDay = new Date(year, month, 0).getDate();
+
     for (let i = startDayOfWeek - 1; i >= 0; i--) {
       const d = prevMonthLastDay - i;
       const dateObj = new Date(year, month - 1, d);
@@ -97,7 +77,6 @@ export function CalendarView() {
       });
     }
 
-    // Current month days
     for (let d = 1; d <= lastDayOfMonth.getDate(); d++) {
       const dateObj = new Date(year, month, d);
       days.push({
@@ -108,7 +87,6 @@ export function CalendarView() {
       });
     }
 
-    // Next month padding days to complete grid (up to 35 or 42 cells)
     const totalCells = days.length > 35 ? 42 : 35;
     const remaining = totalCells - days.length;
     for (let d = 1; d <= remaining; d++) {
@@ -133,11 +111,12 @@ export function CalendarView() {
 
   const todayStr = formatDateString(new Date());
 
-  // Combine events and task due dates
   const allItems = [
-    ...events.map((e) => ({ ...e, type: 'event' })),
+    ...events
+      .filter((e) => !projectId || e.projectId === projectId)
+      .map((e) => ({ ...e, type: 'event' })),
     ...tasks
-      .filter((t) => t.dueDate)
+      .filter((t) => t.dueDate && (!projectId || t.projectId === projectId))
       .map((t) => ({
         id: 'task_' + t.id,
         title: t.title,
@@ -145,172 +124,170 @@ export function CalendarView() {
         kind: 'deadline',
         type: 'task',
         originalTask: t,
+        projectId: t.projectId,
       })),
   ];
 
   const calendarDays = getCalendarDays();
 
   return (
-    <Stack gap="lg">
-      {/* Header Bar */}
-      <Group justify="space-between" align="center">
-        <Group gap="md" align="center">
-          <ActionIcon variant="default" size="lg" radius="md" onClick={handlePrevMonth}>
-            <IconChevronLeft size={18} />
-          </ActionIcon>
+    <TooltipProvider>
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-[18px] w-[18px]" />
+            </Button>
 
-          <Title order={3} style={{ minWidth: 160, textAlign: 'center' }}>
-            {monthNames[month]} {year}
-          </Title>
+            <h3 className="min-w-[160px] text-center text-xl font-semibold">
+              {monthNames[month]} {year}
+            </h3>
 
-          <ActionIcon variant="default" size="lg" radius="md" onClick={handleNextMonth}>
-            <IconChevronRight size={18} />
-          </ActionIcon>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-[18px] w-[18px]" />
+            </Button>
 
-          <Button variant="default" size="sm" radius="md" onClick={handleToday}>
-            Today
-          </Button>
-        </Group>
+            <Button variant="outline" size="sm" onClick={handleToday}>
+              Today
+            </Button>
+          </div>
 
-        {user?.role !== 'viewer' && (
-          <Button leftSection={<IconPlus size={16} />} color="blue" radius="md" onClick={() => handleOpenCreate()}>
-            New Event
-          </Button>
-        )}
-      </Group>
+          {user?.role !== 'viewer' && (
+            <Button onClick={() => handleOpenCreate()}>
+              <Plus className="h-4 w-4" />
+              New Event
+            </Button>
+          )}
+        </div>
 
-      {/* Main Google Calendar Grid */}
-      <Paper withBorder radius="md" p={0} style={{ backgroundColor: '#101113', overflow: 'hidden' }}>
-        {/* Day Header Row */}
-        <SimpleGrid cols={7} spacing={0} style={{ borderBottom: '1px solid #2C2E33', backgroundColor: '#1A1B1E' }}>
-          {WEEKDAYS.map((day) => (
-            <Box key={day} py="xs" style={{ textAlign: 'center', borderRight: '1px solid #2C2E33' }}>
-              <Text size="xs" fw={700} c="dimmed">
-                {day}
-              </Text>
-            </Box>
-          ))}
-        </SimpleGrid>
+        <Card className="overflow-hidden bg-[#101113]">
+          <div className="grid grid-cols-7 border-b border-[#2C2E33] bg-[#1A1B1E]">
+            {WEEKDAYS.map((day) => (
+              <div key={day} className="border-r border-[#2C2E33] py-2 text-center last:border-r-0">
+                <span className="text-xs font-bold text-muted-foreground">{day}</span>
+              </div>
+            ))}
+          </div>
 
-        {/* 7-Column Date Cells */}
-        <SimpleGrid cols={7} spacing={0}>
-          {calendarDays.map((dayItem, idx) => {
-            const isToday = dayItem.dateStr === todayStr;
-            const isPast = dayItem.dateStr < todayStr;
-            const dayItems = allItems.filter((item) => item.date === dayItem.dateStr);
+          <div className="grid grid-cols-7">
+            {calendarDays.map((dayItem, idx) => {
+              const isToday = dayItem.dateStr === todayStr;
+              const isPast = dayItem.dateStr < todayStr;
+              const dayItems = allItems.filter((item) => item.date === dayItem.dateStr);
 
-            return (
-              <Box
-                key={idx}
-                p="xs"
-                style={{
-                  minHeight: 115,
-                  borderRight: (idx + 1) % 7 === 0 ? 'none' : '1px solid #2C2E33',
-                  borderBottom: idx < calendarDays.length - 7 ? '1px solid #2C2E33' : 'none',
-                  backgroundColor: !dayItem.isCurrentMonth ? '#0d0e10' : (isPast ? 'rgba(0, 0, 0, 0.25)' : 'transparent'),
-                  opacity: !dayItem.isCurrentMonth ? 0.35 : (isPast ? 0.6 : 1),
-                  cursor: isPast ? 'not-allowed' : (user?.role !== 'viewer' ? 'pointer' : 'default'),
-                  transition: 'background-color 0.15s ease',
-                }}
-                onClick={() => {
-                  if (isPast) {
-                    notifications.show({ title: 'Past Date', message: 'New events cannot be scheduled on past dates.', color: 'orange' });
-                  } else if (user?.role !== 'viewer') {
-                    handleOpenCreate(dayItem.dateStr);
-                  }
-                }}
-              >
-                {/* Date Number Badge */}
-                <Group justify="space-between" align="center" mb={6}>
-                  <Box
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: '50%',
-                      backgroundColor: isToday ? '#3d7fe0' : 'transparent',
-                      color: isToday ? '#ffffff' : dayItem.isCurrentMonth ? '#c1c2c5' : '#5c5f66',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: isToday ? 700 : 500,
-                      fontSize: 13,
-                    }}
-                  >
-                    {dayItem.dayNum}
-                  </Box>
-
-                  {dayItems.length > 0 && (
-                    <Text size="10px" c="dimmed" fw={600}>
-                      {dayItems.length} {dayItems.length === 1 ? 'item' : 'items'}
-                    </Text>
+              return (
+                <div
+                  key={idx}
+                  className={cn(
+                    'min-h-[115px] p-2 transition-colors',
+                    (idx + 1) % 7 !== 0 && 'border-r border-[#2C2E33]',
+                    idx < calendarDays.length - 7 && 'border-b border-[#2C2E33]',
+                    !dayItem.isCurrentMonth && 'bg-[#0d0e10] opacity-35',
+                    dayItem.isCurrentMonth && isPast && 'bg-black/25 opacity-60',
+                    isPast ? 'cursor-not-allowed' : user?.role !== 'viewer' ? 'cursor-pointer hover:bg-muted/20' : 'cursor-default'
                   )}
-                </Group>
+                  onClick={() => {
+                    if (isPast) {
+                      showNotification({
+                        title: 'Past Date',
+                        message: 'New events cannot be scheduled on past dates.',
+                        color: 'blue',
+                      });
+                    } else if (user?.role !== 'viewer') {
+                      handleOpenCreate(dayItem.dateStr);
+                    }
+                  }}
+                >
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <div
+                      className={cn(
+                        'flex h-[26px] w-[26px] items-center justify-center rounded-full text-[13px]',
+                        isToday && 'bg-[#3d7fe0] font-bold text-white',
+                        !isToday && dayItem.isCurrentMonth && 'font-medium text-[#c1c2c5]',
+                        !isToday && !dayItem.isCurrentMonth && 'text-[#5c5f66]'
+                      )}
+                    >
+                      {dayItem.dayNum}
+                    </div>
+                    {dayItems.length > 0 && (
+                      <span className="text-[10px] font-semibold text-muted-foreground">
+                        {dayItems.length} {dayItems.length === 1 ? 'item' : 'items'}
+                      </span>
+                    )}
+                  </div>
 
-                {/* Day Items List */}
-                <Stack gap={4}>
-                  {dayItems.slice(0, 3).map((item) => {
-                    const isTask = item.type === 'task';
-                    const project = item.projectId ? projects.find((p) => p.id === item.projectId) : null;
+                  <div className="flex flex-col gap-1">
+                    {dayItems.slice(0, 3).map((item) => {
+                      const isTask = item.type === 'task';
+                      const project = item.projectId
+                        ? projects.find((p) => p.id === item.projectId)
+                        : null;
+                      const tintStyle = isTask
+                        ? { backgroundColor: 'rgba(239, 68, 68, 0.18)', borderLeftColor: '#ef4444' }
+                        : isHexColor(project?.colour)
+                          ? getTintStyle(project.colour)
+                          : {
+                              backgroundColor: 'rgba(61, 127, 224, 0.25)',
+                              borderLeftColor: '#3d7fe0',
+                            };
 
-                    return (
-                      <Tooltip
-                        key={item.id}
-                        label={
-                          <Stack gap={2} p={2}>
-                            <Text size="xs" fw={700}>{item.title}</Text>
-                            {item.startTime && <Text size="10px">{item.startTime} - {item.endTime || ''}</Text>}
-                            {item.location && <Text size="10px">📍 {item.location}</Text>}
-                            {project && <Text size="10px">📁 {project.name}</Text>}
-                          </Stack>
-                        }
-                        withArrow
-                      >
-                        <Box
-                          p={4}
-                          style={{
-                            borderRadius: 4,
-                            backgroundColor: isTask ? 'rgba(239, 68, 68, 0.18)' : (project?.colour ? `${project.colour}33` : 'rgba(61, 127, 224, 0.25)'),
-                            borderLeft: `3px solid ${isTask ? '#ef4444' : (project?.colour || '#3d7fe0')}`,
-                            cursor: 'pointer',
-                          }}
-                          onClick={(e) => handleOpenEdit(e, item)}
-                        >
-                          <Group gap={4} wrap="nowrap" style={{ overflow: 'hidden' }}>
-                            {isTask ? (
-                              <IconChecklist size={12} color="#ef4444" style={{ flexShrink: 0 }} />
-                            ) : (
-                              <IconClock size={12} color="#3d7fe0" style={{ flexShrink: 0 }} />
+                      return (
+                        <Tooltip key={item.id}>
+                          <TooltipTrigger asChild>
+                            <div
+                              className="cursor-pointer overflow-hidden rounded border-l-[3px] p-1"
+                              style={tintStyle}
+                              onClick={(e) => handleOpenEdit(e, item)}
+                            >
+                              <div className="flex items-center gap-1 overflow-hidden whitespace-nowrap">
+                                {isTask ? (
+                                  <ListChecks className="h-3 w-3 shrink-0 text-red-500" />
+                                ) : (
+                                  <Clock className="h-3 w-3 shrink-0 text-[#3d7fe0]" />
+                                )}
+                                <span className="truncate text-[11px] font-semibold">
+                                  {item.startTime ? `${item.startTime} ` : ''}
+                                  {item.title}
+                                </span>
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-[220px]">
+                            <p className="text-xs font-bold">{item.title}</p>
+                            {item.startTime && (
+                              <p className="text-[10px]">
+                                {item.startTime} - {item.endTime || ''}
+                              </p>
                             )}
-                            <Text size="xs" truncate fw={600} style={{ fontSize: 11 }}>
-                              {item.startTime ? `${item.startTime} ` : ''}{item.title}
-                            </Text>
-                          </Group>
-                        </Box>
-                      </Tooltip>
-                    );
-                  })}
+                            {item.location && <p className="text-[10px]">📍 {item.location}</p>}
+                            {project && <p className="text-[10px]">📁 {project.name}</p>}
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
 
-                  {dayItems.length > 3 && (
-                    <Text size="10px" c="dimmed" fw={700} ta="center">
-                      +{dayItems.length - 3} more
-                    </Text>
-                  )}
-                </Stack>
-              </Box>
-            );
-          })}
-        </SimpleGrid>
-      </Paper>
+                    {dayItems.length > 3 && (
+                      <p className="text-center text-[10px] font-bold text-muted-foreground">
+                        +{dayItems.length - 3} more
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
 
-      {/* Event Modal */}
-      <EventModal
-        eventItem={selectedEvent}
-        opened={modalOpened}
-        onClose={() => {
-          setModalOpened(false);
-          setSelectedEvent(null);
-        }}
-      />
-    </Stack>
+        <EventModal
+          eventItem={selectedEvent}
+          opened={modalOpened}
+          defaultProjectId={projectId}
+          onClose={() => {
+            setModalOpened(false);
+            setSelectedEvent(null);
+          }}
+        />
+      </div>
+    </TooltipProvider>
   );
 }

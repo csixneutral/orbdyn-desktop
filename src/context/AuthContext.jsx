@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { api } from '../api';
 
 const AuthContext = createContext(null);
@@ -8,21 +9,59 @@ export function AuthProvider({ children }) {
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [user, setUser] = useState(null);
   const [orgName, setOrgName] = useState('Orbdyn Workspace');
-  const [dataFolder, setDataFolder] = useState('');
   const [connectionError, setConnectionError] = useState(false);
+  const [migrationNeeded, setMigrationNeeded] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      refreshBootstrap();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const refreshBootstrap = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setLoading(false);
+      setConnectionError(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setConnectionError(false);
+
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        setConnectionError(true);
+        setMigrationNeeded(false);
+        setSetupNeeded(false);
+        setUser(null);
+        return;
+      }
+
       const data = await api.getBootstrap();
       setSetupNeeded(data.setupNeeded);
       setOrgName(data.orgName || 'Orbdyn Workspace');
-      setDataFolder(data.dataFolder || '');
       setUser(data.me || null);
+      setMigrationNeeded(false);
     } catch (err) {
       console.error('Failed to load bootstrap', err);
-      setConnectionError(true);
+      if (err.code === 'MIGRATION_REQUIRED') {
+        setMigrationNeeded(true);
+        setConnectionError(false);
+      } else {
+        setConnectionError(true);
+        setMigrationNeeded(false);
+      }
       setSetupNeeded(false);
       setUser(null);
     } finally {
@@ -32,6 +71,12 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     refreshBootstrap();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange(() => {
+      refreshBootstrap();
+    });
+
+    return () => subscription.subscription.unsubscribe();
   }, []);
 
   const login = async (username, password) => {
@@ -61,8 +106,9 @@ export function AuthProvider({ children }) {
         setupNeeded,
         user,
         orgName,
-        dataFolder,
         connectionError,
+        migrationNeeded,
+        isOnline,
         login,
         setup,
         logout,
