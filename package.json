@@ -1,0 +1,99 @@
+{
+  "name": "orbdyn",
+  "version": "1.0.0",
+  "description": "Orbdyn — private desktop work tracking, document sharing, calendar and notifications. Your files never leave your computer.",
+  "main": "electron/main.js",
+  "author": "Orbdyn",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "prestart": "npm run build:ui",
+    "start": "electron .",
+    "server": "node server/index.js",
+    "build:ui": "vite build",
+    "dev:ui": "vite",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:all": "electron-builder --win --mac"
+  },
+  "dependencies": {
+    "@mantine/core": "^7.17.0",
+    "@mantine/dates": "^7.17.0",
+    "@mantine/hooks": "^7.17.0",
+    "@mantine/notifications": "^7.17.0",
+    "@tabler/icons-react": "^3.30.0",
+    "clsx": "^2.1.1",
+    "cookie-parser": "^1.4.7",
+    "dayjs": "^1.11.13",
+    "express": "^4.21.2",
+    "multer": "^2.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.5.2",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
+    "vite": "^6.1.0"
+  },
+  "build": {
+    "appId": "com.orbdyn.desktop",
+    "productName": "Orbdyn",
+    "files": [
+      "electron/**/*",
+      "server/**/*",
+      "public/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Orbdyn"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Office"
+    }
+  }
+}
