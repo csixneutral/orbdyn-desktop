@@ -36,11 +36,25 @@ Deno.serve(async (req) => {
       .eq('id', authData.user.id)
       .single();
 
-    if (profileError || !callerProfile || callerProfile.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: corsHeaders });
+    if (profileError || !callerProfile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), { status: 403, headers: corsHeaders });
     }
 
     const workspaceId = callerProfile.active_workspace_id || callerProfile.workspace_id;
+    if (!workspaceId) {
+      return new Response(JSON.stringify({ error: 'Workspace not found' }), { status: 403, headers: corsHeaders });
+    }
+
+    const { data: membership, error: memberError } = await userClient
+      .from('workspace_members')
+      .select('role')
+      .eq('user_id', authData.user.id)
+      .eq('workspace_id', workspaceId)
+      .single();
+
+    if (memberError || !membership || membership.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: corsHeaders });
+    }
 
     const { name, username, password, role, email } = await req.json();
     if (!name || !username || !password) {
@@ -48,7 +62,11 @@ Deno.serve(async (req) => {
     }
 
     const uname = String(username).trim().toLowerCase();
-    const syntheticEmail = `${uname}@orbdyn.local`;
+    const authDomain = new URL(supabaseUrl).hostname;
+    const contactEmail = email ? String(email).trim().toLowerCase() : '';
+    const syntheticEmail = contactEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)
+      ? contactEmail
+      : `${uname}@${authDomain}`;
 
     const { data: created, error: createError } = await adminClient.auth.admin.createUser({
       email: syntheticEmail,

@@ -69,7 +69,6 @@ export function ContextSwitcher({
     try {
       setSwitchingId(workspaceId);
       await onSwitchWorkspace(workspaceId);
-      showNotification({ title: 'Organization switched', message: 'Your workspace has been updated.', color: 'green' });
     } catch (err) {
       showNotification({ title: 'Switch failed', message: err.message, color: 'red' });
     } finally {

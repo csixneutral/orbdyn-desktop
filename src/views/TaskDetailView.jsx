@@ -40,7 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { showNotification } from '@/lib/notify.js';
 import { copyFileDownloadLink, downloadFile, loadFilePreviewUrl } from '@/lib/files';
-import { getBadgeStyle, getColorClasses } from '@/lib/colors';
+import { getColorClasses } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
@@ -365,20 +365,6 @@ export function TaskDetailView({ taskId, onBack }) {
               value={currentAssigneeIds}
               onChange={handleAssigneesChange}
             />
-
-            <div>
-              <p className="mb-1 text-xs font-semibold text-muted-foreground">Project</p>
-              {project ? (
-                <Badge
-                  className={cn('text-sm', getColorClasses(project.colour || 'blue', 'light'))}
-                  style={getBadgeStyle(project.colour)}
-                >
-                  {project.name}
-                </Badge>
-              ) : (
-                <span className="text-sm">-</span>
-              )}
-            </div>
 
             <div>
               <p className="mb-1 text-xs font-semibold text-muted-foreground">Priority</p>

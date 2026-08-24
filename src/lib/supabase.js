@@ -15,8 +15,24 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
   },
 });
 
+export function getAuthEmailDomain() {
+  try {
+    const hostname = new URL(supabaseUrl || '').hostname;
+    if (hostname) return hostname;
+  } catch {
+    // ignore invalid URL
+  }
+  return 'orbdyn.app';
+}
+
 export function usernameToEmail(username) {
-  return `${String(username || '').trim().toLowerCase()}@orbdyn.local`;
+  return `${String(username || '').trim().toLowerCase()}@${getAuthEmailDomain()}`;
+}
+
+export function resolveAuthEmailForUsername(username, optionalContactEmail = '') {
+  const contact = normalizeEmail(optionalContactEmail);
+  if (contact && isValidEmail(contact)) return contact;
+  return usernameToEmail(username);
 }
 
 export function normalizeEmail(value) {

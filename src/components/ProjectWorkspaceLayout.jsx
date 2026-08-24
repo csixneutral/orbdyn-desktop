@@ -51,7 +51,7 @@ export function ProjectWorkspaceLayout({
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh max-h-svh overflow-hidden">
       <ProjectSidebar
         project={project}
         projects={projects}
@@ -63,8 +63,8 @@ export function ProjectWorkspaceLayout({
         onOpenProfile={onOpenProfile}
         onCreateProject={onCreateProject}
       />
-      <SidebarInset className="min-h-0 overflow-hidden">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <SidebarInset className="h-full min-h-0 overflow-hidden">
+        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex-1" />
@@ -94,9 +94,11 @@ export function ProjectWorkspaceLayout({
             />
           </div>
         </header>
-        <div className="relative flex min-h-0 flex-1 flex-col p-4">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           <ApiLoadingOverlay loading={dataLoading} label="Loading workspace..." />
-          <div className="flex min-h-0 w-full flex-1 flex-col">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            {children}
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

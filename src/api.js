@@ -2,7 +2,15 @@
  * src/api.js -- Centralized API client (Supabase).
  */
 
-import { supabase, usernameToEmail, normalizeEmail, isValidEmail, FILES_BUCKET } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+import {
+  supabase,
+  usernameToEmail,
+  resolveAuthEmailForUsername,
+  normalizeEmail,
+  isValidEmail,
+  FILES_BUCKET,
+} from '@/lib/supabase';
 import {
   mapProfile,
   mapProject,
@@ -142,12 +150,22 @@ async function getWorkspaceOrgName(workspaceId) {
 }
 
 async function getAllUserIds(workspaceId) {
-  const { data } = await supabase
+  const { data: members, error: memberError } = await supabase
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId);
+  throwOnError(memberError);
+
+  const ids = (members || []).map((row) => row.user_id).filter(Boolean);
+  if (!ids.length) return [];
+
+  const { data: profiles, error: profileError } = await supabase
     .from('profiles')
-    .select('id')
-    .eq('workspace_id', workspaceId)
-    .eq('active', true);
-  return (data || []).map((u) => u.id);
+    .select('id, active')
+    .in('id', ids);
+  throwOnError(profileError);
+
+  return (profiles || []).filter((row) => row.active !== false).map((row) => row.id);
 }
 
 async function projectAudience(workspaceId, projectId, projectsById) {
@@ -331,7 +349,13 @@ async function removeStorageFile(path) {
   await supabase.storage.from(FILES_BUCKET).remove([path]);
 }
 
-function authEmailFromProfile(row) {
+async function authEmailFromProfile(row) {
+  if (row?.username) {
+    const { data, error } = await supabase.rpc('login_email_for_username', {
+      p_username: String(row.username).trim().toLowerCase(),
+    });
+    if (!error && data) return data;
+  }
   if (row?.email && isValidEmail(row.email)) return normalizeEmail(row.email);
   return usernameToEmail(row?.username);
 }
@@ -475,6 +499,61 @@ async function legacyClientSetup({ name, username, password, orgName, contactEma
     user: setupData?.user || null,
     orgName: setupData?.orgName || orgName || 'Orbdyn Workspace',
   };
+}
+
+async function legacyCreateUser({ name, username, password, role, email }) {
+  const uname = String(username).trim().toLowerCase();
+  const pwd = String(password);
+
+  if (!name?.trim() || !uname || !pwd) {
+    throw new Error('Name, username and password are required.');
+  }
+  if (pwd.length < 6) throw new Error('Password must be at least 6 characters.');
+
+  const authEmail = resolveAuthEmailForUsername(uname, email);
+  const tempClient = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_ANON_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+
+  const { data: signUpData, error: signUpError } = await tempClient.auth.signUp({
+    email: authEmail,
+    password: pwd,
+    options: {
+      data: { name: String(name).trim(), username: uname },
+    },
+  });
+
+  if (signUpError) {
+    if (/already|registered|exists/i.test(signUpError.message || '')) {
+      throw new Error('Username or email is already in use.');
+    }
+    throw formatAuthError(signUpError, 'Could not create user.');
+  }
+
+  const newUserId = signUpData?.user?.id;
+  if (!newUserId) throw new Error('Account was created but user id was missing.');
+
+  const { data, error } = await supabase.rpc('admin_attach_workspace_user', {
+    p_user_id: newUserId,
+    p_name: String(name).trim(),
+    p_username: uname,
+    p_email: email ? String(email).trim() : '',
+    p_role: role || 'member',
+  });
+
+  if (error) {
+    throw formatAuthError(error, 'Could not add person to workspace.');
+  }
+
+  return { user: data?.user || null };
 }
 
 export const api = {
@@ -639,7 +718,7 @@ export const api = {
     const { row } = await getSessionProfile();
 
     const { error: verifyError } = await supabase.auth.signInWithPassword({
-      email: authEmailFromProfile(row),
+      email: await authEmailFromProfile(row),
       password: String(current || ''),
     });
     if (verifyError) throw new Error('Your current password is not correct.');
@@ -653,10 +732,7 @@ export const api = {
   // Users
   getUsers: async () => {
     await getSessionProfile();
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabase.rpc('list_workspace_people');
     throwOnError(error);
     return { users: (data || []).map(mapProfile) };
   },
@@ -666,58 +742,41 @@ export const api = {
     assertAdmin(profile);
 
     const { name, username, password, role, email } = payload || {};
-    const { data, error } = await supabase.functions.invoke('create-user', {
-      body: { name, username, password, role, email },
-    });
+    const body = { name, username, password, role, email };
 
-    if (error) throw new Error(error.message || 'Could not create user.');
-    if (data?.error) throw new Error(data.error);
+    const { data, error: fnError } = await supabase.functions.invoke('create-user', { body });
 
-    return { user: data.user };
+    if (!fnError && data && !data.error) {
+      return { user: data.user };
+    }
+
+    if (fnError && !/Function not found|404|Failed to send a request to the Edge Function|403|privileges/i.test(fnError.message || '')) {
+      if (data?.error) throw new Error(data.error);
+      throw formatAuthError(fnError, 'Could not create user.');
+    }
+
+    return legacyCreateUser(body);
   },
 
   updateUser: async (id, payload) => {
-    const { profile, row } = await getSessionProfile();
+    const { profile } = await getSessionProfile();
     assertAdmin(profile);
 
-    const { data: existing, error: fetchError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', id)
-      .eq('workspace_id', row.workspace_id)
-      .single();
-    if (fetchError || !existing) throw new Error('No such person.');
-
     const { name, role, email, active, password } = payload || {};
-    const updates = {};
+    const { data, error } = await supabase.rpc('update_workspace_member', {
+      p_user_id: id,
+      p_name: name !== undefined ? String(name).trim() : null,
+      p_email: email !== undefined ? String(email).trim() : null,
+      p_role: role !== undefined ? normalizeRole(role) : null,
+      p_active: active !== undefined ? !!active : null,
+    });
+    throwOnError(error, 'Could not update person.');
 
-    if (name !== undefined) updates.name = String(name).trim();
-    if (email !== undefined) updates.email = String(email).trim();
-    if (role !== undefined) updates.role = normalizeRole(role);
-
-    if (active !== undefined) {
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('workspace_id', row.workspace_id)
-        .eq('role', 'admin')
-        .eq('active', true);
-      if (!active && existing.role === 'admin' && (admins || []).length <= 1) {
-        throw new Error('You cannot switch off the only administrator.');
-      }
-      updates.active = !!active;
+    if (password) {
+      throw new Error('Password changes for other users are not supported from the client.');
     }
 
-    if (Object.keys(updates).length) {
-      const { data, error } = await supabase.from('profiles').update(updates).eq('id', id).select('*').single();
-      throwOnError(error);
-      if (password) {
-        throw new Error('Password changes for other users are not supported from the client.');
-      }
-      return { user: mapProfile(data) };
-    }
-
-    return { user: mapProfile(existing) };
+    return { user: data?.user || null };
   },
 
   deleteUser: async (id) => {
@@ -726,23 +785,10 @@ export const api = {
 
     if (id === profile.id) throw new Error('You cannot delete your own account.');
 
-    const { data: userItem, error: fetchError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', id)
-      .eq('workspace_id', row.workspace_id)
-      .single();
-    if (fetchError || !userItem) throw new Error('No such person.');
-
-    const { data: admins } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('workspace_id', row.workspace_id)
-      .eq('role', 'admin')
-      .eq('active', true);
-    if (userItem.role === 'admin' && (admins || []).length <= 1) {
-      throw new Error('You cannot delete the only administrator.');
-    }
+    const { data: members, error: listError } = await supabase.rpc('list_workspace_people');
+    throwOnError(listError);
+    const userItem = (members || []).find((u) => u.id === id);
+    if (!userItem) throw new Error('No such person in this organization.');
 
     const snapshot = mapProfile(userItem);
     await softDeleteToTrash({
@@ -755,14 +801,8 @@ export const api = {
       deletedByName: profile.name,
     });
 
-    const { error } = await supabase.from('profiles').delete().eq('id', id);
-    throwOnError(error, 'Could not delete user profile.');
-
-    await logActivity(row.workspace_id, {
-      actorId: profile.id,
-      action: 'moved person to trash',
-      subject: userItem.name,
-    });
+    const { error } = await supabase.rpc('remove_workspace_member', { p_user_id: id });
+    throwOnError(error, 'Could not remove person from this organization.');
 
     return { ok: true };
   },
@@ -1760,18 +1800,19 @@ export const api = {
   getDashboard: async () => {
     const { profile, row } = await getSessionProfile();
 
-    const [{ mapped: projects }, { data: taskRows }, { data: fileRows }, { data: userRows }] = await Promise.all([
+    const [{ mapped: projects }, { data: taskRows }, { data: fileRows }, peopleRes] = await Promise.all([
       fetchProjectsMap(row.workspace_id),
       supabase.from('tasks').select('*').eq('workspace_id', row.workspace_id),
       supabase.from('files').select('*').eq('workspace_id', row.workspace_id),
-      supabase.from('profiles').select('*').eq('workspace_id', row.workspace_id).eq('active', true),
+      supabase.rpc('list_workspace_people'),
     ]);
+    throwOnError(peopleRes.error);
 
     const visible = visibleProjects(profile, projects);
     const allowed = new Set(visible.map((p) => p.id));
     const tasks = (taskRows || []).map(mapTask).filter((t) => !t.projectId || allowed.has(t.projectId));
     const files = (fileRows || []).map(mapFile).filter((f) => !f.projectId || allowed.has(f.projectId));
-    const users = (userRows || []).map(mapProfile);
+    const users = (peopleRes.data || []).map(mapProfile).filter((u) => u && u.active !== false);
     const today = new Date().toISOString().slice(0, 10);
 
     const byStatus = {};
