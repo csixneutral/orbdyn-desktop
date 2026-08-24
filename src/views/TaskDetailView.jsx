@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   ArrowLeft,
   Pencil,
@@ -10,7 +11,6 @@ import {
   Trash2,
   Link,
   AlertTriangle,
-  Loader2,
   ChevronsUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -548,7 +548,7 @@ export function TaskDetailView({ taskId, onBack }) {
                 />
               </div>
               <Button type="submit" disabled={uploading}>
-                {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {uploading && <Spinner />}
                 Attach Document
               </Button>
             </div>
@@ -577,7 +577,7 @@ export function TaskDetailView({ taskId, onBack }) {
             )
           ) : (
             <div className="flex h-[40vh] items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Spinner className="size-8 text-muted-foreground" />
             </div>
           )}
         </DialogContent>
@@ -600,7 +600,7 @@ export function TaskDetailView({ taskId, onBack }) {
               Cancel
             </Button>
             <Button variant="destructive" disabled={deleting} onClick={handleConfirmDelete}>
-              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deleting && <Spinner />}
               Delete Task
             </Button>
           </DialogFooter>

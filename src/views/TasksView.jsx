@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Plus,
   Search,
@@ -8,7 +9,6 @@ import {
   Trash2,
   AlertTriangle,
   GripVertical,
-  Loader2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,6 @@ import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -49,7 +48,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { showNotification } from '@/lib/notify.js';
-import { getBadgeStyle, getColorClasses, getProgressStyle } from '@/lib/colors';
+import { getColorClasses, getProgressStyle } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
@@ -242,7 +241,7 @@ export function TasksView({ initialTaskId, projectId }) {
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-[480px] flex-col gap-4" style={{ height: 'calc(100vh - 125px)' }}>
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
         <PageHeader
           title="Tasks"
           description="Track progress, assign tasks, and drag cards to reorder or change status"
@@ -327,8 +326,9 @@ export function TasksView({ initialTaskId, projectId }) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="kanban" className="mt-0 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
-            <div className="flex min-h-0 flex-1 gap-4 overflow-x-auto pb-1.5">
+          <TabsContent value="kanban" className="mt-0 -mx-4 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+            <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth px-4 pb-2">
+              <div className="flex h-full min-h-[360px] w-max gap-4">
               {COLUMNS.map((col) => {
                 const colTasks = filteredTasks.filter((t) => t.status === col.id).sort(sortTasksByOrder);
                 const isColumnHovered = dragOverColumnId === col.id;
@@ -337,7 +337,7 @@ export function TasksView({ initialTaskId, projectId }) {
                   <div
                     key={col.id}
                     className={cn(
-                      'flex min-h-0 w-full min-w-[260px] max-w-[320px] flex-1 flex-col rounded-lg border p-3 transition-all',
+                      'flex h-full w-[300px] shrink-0 flex-col rounded-lg border p-3 transition-all',
                       isColumnHovered ? 'border-dashed border-primary bg-[#1a2234] outline outline-2 outline-primary' : 'bg-[#141517]'
                     )}
                     onDragOver={(e) => {
@@ -365,9 +365,9 @@ export function TasksView({ initialTaskId, projectId }) {
                       </div>
                     </div>
 
-                    <ScrollArea className="flex-1">
+                    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                       <div
-                        className="flex min-h-[120px] flex-1 flex-col gap-2 pr-2"
+                        className="flex min-h-[120px] flex-col gap-2"
                         onDragOver={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -384,7 +384,6 @@ export function TasksView({ initialTaskId, projectId }) {
                           <p className="py-8 text-center text-xs italic text-muted-foreground">Drop tasks here</p>
                         ) : (
                           colTasks.map((task) => {
-                            const project = projects.find((p) => p.id === task.projectId);
                             const assignee = users.find((u) => u.id === task.assigneeId);
                             const isDraggingThis = draggedTaskId === task.id;
                             const isDragOverThis = dragOverTaskId === task.id;
@@ -451,15 +450,6 @@ export function TasksView({ initialTaskId, projectId }) {
                                       <span className="text-xs font-bold text-muted-foreground">{task.ref}</span>
                                     </div>
                                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                      {project && (
-                                        <Badge
-                                          variant="secondary"
-                                          className={cn(getColorClasses(project.colour || 'blue', 'light'))}
-                                          style={getBadgeStyle(project.colour)}
-                                        >
-                                          {project.name}
-                                        </Badge>
-                                      )}
                                       {(user?.role === 'admin' || task.createdBy === user?.id) && (
                                         <Button
                                           variant="ghost"
@@ -517,10 +507,11 @@ export function TasksView({ initialTaskId, projectId }) {
                           })
                         )}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </div>
                 );
               })}
+              </div>
             </div>
           </TabsContent>
 
@@ -531,7 +522,6 @@ export function TasksView({ initialTaskId, projectId }) {
                   <TableRow>
                     <TableHead>Ref</TableHead>
                     <TableHead>Title</TableHead>
-                    <TableHead>Project</TableHead>
                     <TableHead>Assignee</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Progress</TableHead>
@@ -542,13 +532,12 @@ export function TasksView({ initialTaskId, projectId }) {
                 <TableBody>
                   {filteredTasks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                         No tasks found.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredTasks.map((t) => {
-                      const project = projects.find((p) => p.id === t.projectId);
                       const assignee = users.find((u) => u.id === t.assigneeId);
                       const statusCol = COLUMNS.find((c) => c.id === t.status);
                       return (
@@ -562,19 +551,6 @@ export function TasksView({ initialTaskId, projectId }) {
                           </TableCell>
                           <TableCell>
                             <span className="text-sm font-semibold">{t.title}</span>
-                          </TableCell>
-                          <TableCell>
-                            {project ? (
-                              <Badge
-                                variant="secondary"
-                                className={cn(getColorClasses(project.colour || 'blue', 'light'))}
-                                style={getBadgeStyle(project.colour)}
-                              >
-                                {project.name}
-                              </Badge>
-                            ) : (
-                              '-'
-                            )}
                           </TableCell>
                           <TableCell>{assignee ? assignee.name : 'Unassigned'}</TableCell>
                           <TableCell>
@@ -651,7 +627,7 @@ export function TasksView({ initialTaskId, projectId }) {
                 Cancel
               </Button>
               <Button variant="destructive" disabled={deleting} onClick={handleConfirmDelete}>
-                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {deleting && <Spinner />}
                 Delete Task
               </Button>
             </DialogFooter>

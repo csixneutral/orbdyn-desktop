@@ -22,10 +22,11 @@ export function DataProvider({ children }) {
   const [shareStatus, setShareStatus] = useState({ online: true, url: null, lan: [], port: null, cloud: true });
   const [loading, setLoading] = useState(false);
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (options = {}) => {
+    const { silent = false } = options;
     if (!user) return;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const [pRes, tRes, uRes, fRes, eRes, aRes, nRes, dRes, sRes, trRes] = await Promise.allSettled([
         api.getProjects(),
         api.getTasks(),
@@ -55,7 +56,7 @@ export function DataProvider({ children }) {
     } catch (err) {
       console.error('Error fetching workspace data', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [user]);
 
@@ -104,13 +105,13 @@ export function DataProvider({ children }) {
         if (window.orbdyn?.notify) {
           window.orbdyn.notify(row.title, row.body);
         }
-        fetchAll();
+        fetchAll({ silent: true });
       }
     );
 
     tables.forEach((table) => {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-        fetchAll();
+        fetchAll({ silent: true });
       });
     });
 

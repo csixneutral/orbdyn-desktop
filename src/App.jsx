@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { LoadingScreen } from '@/components/ui/loading-overlay';
 import { TypographyH3, TypographyMuted } from '@/components/ui/typography';
 import { useAuth } from './context/AuthContext';
 import { useData } from './context/DataContext';
@@ -18,6 +18,7 @@ import { CalendarView } from './views/CalendarView';
 import { PeopleView } from './views/PeopleView';
 import { ActivityView } from './views/ActivityView';
 import { SettingsView } from './views/SettingsView';
+import { ProfileView } from './views/ProfileView';
 import { RecycleBinView } from './views/RecycleBinView';
 
 function resolveProjectIdFromLink(link, tasks, projects) {
@@ -53,8 +54,8 @@ function mapNotificationLink(link, tasks) {
 }
 
 export function App() {
-  const { loading, setupNeeded, user, orgName, connectionError, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
-  const { tasks, projects } = useData();
+  const { loading, user, connectionError, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
+  const { tasks, projects, loading: dataLoading } = useData();
 
   const [authScreen, setAuthScreen] = useState('welcome');
   const [homeView, setHomeView] = useState('projects');
@@ -103,12 +104,7 @@ export function App() {
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <TypographyMuted className="mt-3">Connecting to Orbdyn...</TypographyMuted>
-      </div>
-    );
+    return <LoadingScreen label="Connecting to Orbdyn..." />;
   }
 
   if (!isOnline) {
@@ -215,6 +211,7 @@ export function App() {
       <ProjectWorkspaceLayout
         project={activeProject}
         projects={projects}
+        dataLoading={dataLoading}
         currentView={projectView}
         onNavigate={handleProjectNavigate}
         onSelectProject={(projectId) => {
@@ -232,9 +229,9 @@ export function App() {
           setActiveProjectId(null);
           setHomeView('people');
         }}
-        onOpenSettings={() => {
+        onOpenProfile={() => {
           setActiveProjectId(null);
-          setHomeView('settings');
+          setHomeView('profile');
         }}
         onCreateProject={() => {
           setActiveProjectId(null);
@@ -249,6 +246,8 @@ export function App() {
 
   const renderHomeView = () => {
     switch (homeView) {
+      case 'profile':
+        return <ProfileView />;
       case 'settings':
         return <SettingsView />;
       case 'people':
@@ -272,7 +271,7 @@ export function App() {
   };
 
   return (
-    <HomeLayout currentView={homeView} onNavigate={handleHomeNavigate} onWorkspaceChanged={handleWorkspaceChanged}>
+    <HomeLayout currentView={homeView} onNavigate={handleHomeNavigate} onWorkspaceChanged={handleWorkspaceChanged} dataLoading={dataLoading}>
       {renderHomeView()}
     </HomeLayout>
   );

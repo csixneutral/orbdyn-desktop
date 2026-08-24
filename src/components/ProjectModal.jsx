@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Folder,
   Trash2,
@@ -8,7 +9,6 @@ import {
   Calendar,
   Check,
   AlertTriangle,
-  Loader2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -293,7 +293,7 @@ export function ProjectModal({ project, opened, onClose }) {
                 </Button>
                 <Button onClick={handleSave} disabled={submitting} size="sm">
                   {submitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Spinner />
                   ) : project ? (
                     <Pencil className="h-4 w-4" />
                   ) : (
@@ -326,7 +326,7 @@ export function ProjectModal({ project, opened, onClose }) {
               disabled={deleting}
               onClick={handleConfirmDelete}
             >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deleting && <Spinner />}
               Delete Project
             </AlertDialogAction>
           </AlertDialogFooter>

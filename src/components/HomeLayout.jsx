@@ -7,10 +7,11 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AppSidebar } from './AppSidebar';
 import { NotificationsPopover } from './NotificationsPopover';
+import { ApiLoadingOverlay } from '@/components/ui/loading-overlay';
 import { useData } from '../context/DataContext';
 import { api } from '../api';
 
-export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, children }) {
+export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, dataLoading, children }) {
   const { notificationList, unreadNotifications, refresh } = useData();
   const { theme, setTheme } = useTheme();
 
@@ -71,7 +72,8 @@ export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, childr
             />
           </div>
         </header>
-        <div className="flex flex-1 flex-col p-4">
+        <div className="relative flex flex-1 flex-col p-4">
+          <ApiLoadingOverlay loading={dataLoading} label="Loading workspace..." />
           <div className="mx-auto w-full max-w-[1400px]">{children}</div>
         </div>
       </SidebarInset>

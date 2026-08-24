@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Building2, Check, ChevronsUpDown, FolderKanban, Loader2, Plus, Settings, Users } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Building2, Check, ChevronsUpDown, FolderKanban, Plus, Settings, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,9 +108,10 @@ export function ContextSwitcher({
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton
                 size="lg"
+                tooltip="Orbdyn"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
                   O
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
@@ -178,7 +180,7 @@ export function ContextSwitcher({
                         {ws.id === activeWorkspaceId || ws.active ? (
                           <Check className="ml-auto size-4" />
                         ) : switchingId === ws.id ? (
-                          <Loader2 className="ml-auto size-4 animate-spin" />
+                          <Spinner className="ml-auto size-4" />
                         ) : null}
                       </DropdownMenuItem>
                     ))
@@ -240,7 +242,7 @@ export function ContextSwitcher({
                 Cancel
               </Button>
               <Button type="submit" disabled={creating}>
-                {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+                {creating && <Spinner />}
                 Create
               </Button>
             </DialogFooter>

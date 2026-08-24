@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Trash2,
   RefreshCw,
@@ -7,7 +8,6 @@ import {
   ListChecks,
   FileText,
   User,
-  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -274,7 +274,7 @@ export function RecycleBinView() {
               Cancel
             </Button>
             <Button variant="destructive" disabled={submitting} onClick={handleConfirmAction}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting && <Spinner />}
               Delete Permanently
             </Button>
           </DialogFooter>

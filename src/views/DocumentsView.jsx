@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Upload,
   Download,
@@ -6,7 +7,6 @@ import {
   Eye,
   FileText,
   AlertTriangle,
-  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -340,7 +340,7 @@ export function DocumentsView({ projectId }) {
             </div>
 
             <Button type="submit" disabled={uploading} className="w-full">
-              {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {uploading && <Spinner />}
               Share Document
             </Button>
           </form>
@@ -368,7 +368,7 @@ export function DocumentsView({ projectId }) {
             )
           ) : (
             <div className="flex h-[40vh] items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Spinner className="size-8 text-muted-foreground" />
             </div>
           )}
         </DialogContent>
@@ -393,7 +393,7 @@ export function DocumentsView({ projectId }) {
               disabled={deleting}
               onClick={handleConfirmDelete}
             >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deleting && <Spinner />}
               Delete Document
             </AlertDialogAction>
           </AlertDialogFooter>

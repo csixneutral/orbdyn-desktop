@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Building2, KeyRound, ShieldCheck, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Building2, KeyRound, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -200,7 +201,7 @@ export function SetupView({ onBack, onSignIn }) {
                       Previous
                     </Button>
                     <Button type="submit" className="w-full sm:flex-1" size="lg" disabled={loading}>
-                      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {loading && <Spinner />}
                       Create account
                     </Button>
                   </div>

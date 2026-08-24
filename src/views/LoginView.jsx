@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LogIn, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -81,7 +82,7 @@ export function LoginView({ onBack, onGetStarted }) {
               </div>
 
               <Button type="submit" className="mt-1 w-full" size="lg" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading && <Spinner />}
                 Sign in
               </Button>
             </div>

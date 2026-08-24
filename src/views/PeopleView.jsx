@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { UserPlus, Pencil, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { UserPlus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -220,7 +221,7 @@ export function PeopleView({ projectId }) {
               disabled={deleting}
               onClick={handleConfirmDelete}
             >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {deleting && <Spinner />}
               Remove Person
             </AlertDialogAction>
           </AlertDialogFooter>

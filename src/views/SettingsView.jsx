@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Cloud, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -85,7 +86,7 @@ export function SettingsView() {
                 />
               </div>
               <Button type="submit" disabled={passwordLoading} className="w-fit">
-                {passwordLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {passwordLoading && <Spinner />}
                 Update Password
               </Button>
             </div>

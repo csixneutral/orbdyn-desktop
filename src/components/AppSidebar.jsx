@@ -1,21 +1,5 @@
 import React from 'react';
-import {
-  ChevronsUpDown,
-  Folder,
-  LogOut,
-  Settings,
-  Trash2,
-  Users,
-} from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Folder, Trash2, Users } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -31,7 +15,7 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { ContextSwitcher } from '@/components/sidebar/ContextSwitcher';
-import { cn } from '@/lib/utils';
+import { SidebarUserMenu } from '@/components/sidebar/SidebarUserMenu';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -49,7 +33,6 @@ const NAV_ITEMS = [
   { id: 'projects', label: 'Projects', icon: Folder },
   { id: 'people', label: 'People', icon: Users },
   { id: 'trash', label: 'Recycle Bin', icon: Trash2 },
-  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export function AppSidebar({ currentView, onNavigate, onSwitchWorkspace, onCreateOrganization, onWorkspaceChanged, ...props }) {
@@ -78,7 +61,6 @@ export function AppSidebar({ currentView, onNavigate, onSwitchWorkspace, onCreat
           activeWorkspaceId={activeWorkspaceId}
           onAllProjects={() => onNavigate('projects')}
           onOpenPeople={() => onNavigate('people')}
-          onOpenSettings={() => onNavigate('settings')}
           onSwitchWorkspace={handleSwitch}
           onCreateOrganization={handleCreateOrg}
         />
@@ -112,49 +94,12 @@ export function AppSidebar({ currentView, onNavigate, onSwitchWorkspace, onCreat
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarFallback className={cn('rounded-lg text-xs font-semibold', avatarColorClass)}>
-                      {user?.name ? user.name[0].toUpperCase() : '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{user?.name}</span>
-                    <span className="truncate text-xs capitalize text-muted-foreground">{user?.role}</span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg" side="bottom" align="end" sideOffset={4}>
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarFallback className={cn('rounded-lg text-xs font-semibold', avatarColorClass)}>
-                        {user?.name ? user.name[0].toUpperCase() : '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-medium">{user?.name}</span>
-                      <span className="truncate text-xs text-muted-foreground">@{user?.username}</span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
-                  <LogOut />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <SidebarUserMenu
+          user={user}
+          avatarColorClass={avatarColorClass}
+          onOpenProfile={() => onNavigate('profile')}
+          onLogout={logout}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

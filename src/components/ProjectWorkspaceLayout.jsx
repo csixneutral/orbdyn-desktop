@@ -7,18 +7,20 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/s
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ProjectSidebar } from './ProjectSidebar';
 import { NotificationsPopover } from './NotificationsPopover';
+import { ApiLoadingOverlay } from '@/components/ui/loading-overlay';
 import { useData } from '../context/DataContext';
 import { api } from '../api';
 
 export function ProjectWorkspaceLayout({
   project,
   projects,
+  dataLoading,
   currentView,
   onNavigate,
   onBackToProjects,
   onSelectProject,
   onOpenPeople,
-  onOpenSettings,
+  onOpenProfile,
   onCreateProject,
   children,
 }) {
@@ -58,10 +60,10 @@ export function ProjectWorkspaceLayout({
         onSelectProject={onSelectProject}
         onBackToProjects={onBackToProjects}
         onOpenPeople={onOpenPeople}
-        onOpenSettings={onOpenSettings}
+        onOpenProfile={onOpenProfile}
         onCreateProject={onCreateProject}
       />
-      <SidebarInset>
+      <SidebarInset className="min-h-0 overflow-hidden">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -92,8 +94,9 @@ export function ProjectWorkspaceLayout({
             />
           </div>
         </header>
-        <div className="flex flex-1 flex-col p-4">
-          <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+        <div className="relative flex min-h-0 flex-1 flex-col p-4">
+          <ApiLoadingOverlay loading={dataLoading} label="Loading workspace..." />
+          <div className="flex min-h-0 w-full flex-1 flex-col">{children}</div>
         </div>
       </SidebarInset>
     </SidebarProvider>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Trash2, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Calendar, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -278,7 +279,7 @@ export function EventModal({ eventItem, opened, onClose, defaultProjectId }) {
                 Cancel
               </Button>
               <Button onClick={handleSave} disabled={submitting}>
-                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {submitting && <Spinner />}
                 {eventItem?.id ? 'Save Changes' : 'Schedule Event'}
               </Button>
             </div>

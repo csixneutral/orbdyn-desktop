@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { User, Loader2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { User } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -170,7 +171,7 @@ export function UserModal({ editUser, opened, onClose }) {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting && <Spinner />}
               {editUser ? 'Save Changes' : 'Add Person'}
             </Button>
           </div>

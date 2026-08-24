@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   CheckSquare,
   Send,
@@ -10,7 +11,6 @@ import {
   ListChecks,
   FileText,
   Plus,
-  Loader2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -468,7 +468,7 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
               </Button>
               <Button onClick={handleSave} disabled={submitting} size="sm">
                 {submitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Spinner />
                 ) : taskId ? (
                   <ListChecks className="h-4 w-4" />
                 ) : (

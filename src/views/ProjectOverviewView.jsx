@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CalendarDays, FileText, ListChecks, Plus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,12 +9,14 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { getBadgeStyle, getColorClasses, getProgressStyle } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 import { PageHeader, TypographyMuted } from '@/components/ui/typography';
+import { TaskModal } from '../components/TaskModal';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 
 export function ProjectOverviewView({ projectId, onNavigate }) {
   const { user } = useAuth();
   const { projects, tasks, files, users } = useData();
+  const [createModalOpened, setCreateModalOpened] = useState(false);
 
   const project = projects.find((p) => p.id === projectId);
   if (!project) {
@@ -40,7 +42,7 @@ export function ProjectOverviewView({ projectId, onNavigate }) {
           description={project.description || 'Project overview and quick actions'}
         >
           {user?.role !== 'viewer' && (
-            <Button size="sm" className="gap-1" onClick={() => onNavigate('tasks')}>
+            <Button size="sm" className="gap-1" onClick={() => setCreateModalOpened(true)}>
               <Plus className="h-4 w-4" />
               New task
             </Button>
@@ -170,6 +172,12 @@ export function ProjectOverviewView({ projectId, onNavigate }) {
           </CardContent>
         </Card>
       </div>
+
+      <TaskModal
+        opened={createModalOpened}
+        onClose={() => setCreateModalOpened(false)}
+        defaultProjectId={projectId}
+      />
     </TooltipProvider>
   );
 }
