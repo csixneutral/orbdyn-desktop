@@ -61,6 +61,7 @@ export function App() {
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [projectView, setProjectView] = useState('overview');
   const [taskHighlightId, setTaskHighlightId] = useState(null);
+  const [createProjectOnHome, setCreateProjectOnHome] = useState(false);
 
   const activeProject = projects.find((p) => p.id === activeProjectId) || null;
 
@@ -172,19 +173,23 @@ export function App() {
         <LoginView
           onBack={() => setAuthScreen('welcome')}
           onGetStarted={() => setAuthScreen('setup')}
-          setupNeeded={setupNeeded}
         />
       );
     }
     return (
       <WelcomeView
-        setupNeeded={setupNeeded}
-        orgName={orgName}
         onGetStarted={() => setAuthScreen('setup')}
         onSignIn={() => setAuthScreen('login')}
       />
     );
   }
+
+  const handleWorkspaceChanged = () => {
+    setActiveProjectId(null);
+    setProjectView('overview');
+    setHomeView('projects');
+    setTaskHighlightId(null);
+  };
 
   if (activeProjectId && activeProject) {
     const renderProjectView = () => {
@@ -209,13 +214,32 @@ export function App() {
     return (
       <ProjectWorkspaceLayout
         project={activeProject}
+        projects={projects}
         currentView={projectView}
         onNavigate={handleProjectNavigate}
+        onSelectProject={(projectId) => {
+          setActiveProjectId(projectId);
+          setProjectView('overview');
+          setTaskHighlightId(null);
+        }}
         onBackToProjects={() => {
           setActiveProjectId(null);
           setProjectView('overview');
           setTaskHighlightId(null);
           setHomeView('projects');
+        }}
+        onOpenPeople={() => {
+          setActiveProjectId(null);
+          setHomeView('people');
+        }}
+        onOpenSettings={() => {
+          setActiveProjectId(null);
+          setHomeView('settings');
+        }}
+        onCreateProject={() => {
+          setActiveProjectId(null);
+          setHomeView('projects');
+          setCreateProjectOnHome(true);
         }}
       >
         {renderProjectView()}
@@ -235,6 +259,8 @@ export function App() {
       default:
         return (
           <ProjectsView
+            openCreateOnMount={createProjectOnHome}
+            onCreateMountHandled={() => setCreateProjectOnHome(false)}
             onOpenProject={(projectId) => {
               setActiveProjectId(projectId);
               setProjectView('overview');
@@ -246,7 +272,7 @@ export function App() {
   };
 
   return (
-    <HomeLayout currentView={homeView} onNavigate={handleHomeNavigate}>
+    <HomeLayout currentView={homeView} onNavigate={handleHomeNavigate} onWorkspaceChanged={handleWorkspaceChanged}>
       {renderHomeView()}
     </HomeLayout>
   );

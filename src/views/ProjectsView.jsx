@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Pencil, CalendarDays, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,7 +45,7 @@ function getAvatarBg(color) {
   return AVATAR_COLORS[color] || AVATAR_COLORS.blue;
 }
 
-export function ProjectsView({ onOpenProject }) {
+export function ProjectsView({ onOpenProject, openCreateOnMount = false, onCreateMountHandled }) {
   const { user } = useAuth();
   const { projects, users, tasks, refresh } = useData();
 
@@ -59,6 +59,13 @@ export function ProjectsView({ onOpenProject }) {
     setSelectedProject(null);
     setModalOpened(true);
   };
+
+  useEffect(() => {
+    if (!openCreateOnMount || user?.role === 'viewer') return;
+    setSelectedProject(null);
+    setModalOpened(true);
+    onCreateMountHandled?.();
+  }, [openCreateOnMount, user?.role, onCreateMountHandled]);
 
   const handleOpenEdit = (e, p) => {
     e.stopPropagation();

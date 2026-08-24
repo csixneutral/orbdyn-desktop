@@ -40,6 +40,8 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Admin access required' }), { status: 403, headers: corsHeaders });
     }
 
+    const workspaceId = callerProfile.active_workspace_id || callerProfile.workspace_id;
+
     const { name, username, password, role, email } = await req.json();
     if (!name || !username || !password) {
       return new Response(JSON.stringify({ error: 'Name, username and password are required' }), { status: 400, headers: corsHeaders });
@@ -67,7 +69,8 @@ Deno.serve(async (req) => {
       .from('profiles')
       .insert({
         id: created.user.id,
-        workspace_id: callerProfile.workspace_id,
+        workspace_id: workspaceId,
+        active_workspace_id: workspaceId,
         name: String(name).trim(),
         username: uname,
         email: email || '',
@@ -84,8 +87,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: insertError.message }), { status: 400, headers: corsHeaders });
     }
 
+    await adminClient.from('workspace_members').upsert({
+      user_id: created.user.id,
+      workspace_id: workspaceId,
+      role: resolvedRole,
+    });
+
     await adminClient.from('activity_log').insert({
-      workspace_id: callerProfile.workspace_id,
+      workspace_id: workspaceId,
       actor_id: callerProfile.id,
       action: 'added a person',
       subject: profile.name,

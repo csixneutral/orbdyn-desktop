@@ -30,7 +30,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { TypographyLarge, TypographyMuted } from '@/components/ui/typography';
+import { ContextSwitcher } from '@/components/sidebar/ContextSwitcher';
 import { cn } from '@/lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -52,27 +52,36 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-export function AppSidebar({ currentView, onNavigate, ...props }) {
-  const { user, logout, orgName } = useAuth();
+export function AppSidebar({ currentView, onNavigate, onSwitchWorkspace, onCreateOrganization, onWorkspaceChanged, ...props }) {
+  const { user, logout, orgName, workspaces, activeWorkspaceId, switchWorkspace, createOrganization } = useAuth();
   const { trash } = useData();
   const avatarColorClass = AVATAR_COLORS[user?.color] || AVATAR_COLORS.blue;
+
+  const handleSwitch = async (workspaceId) => {
+    const fn = onSwitchWorkspace || switchWorkspace;
+    await fn(workspaceId);
+    onWorkspaceChanged?.();
+  };
+
+  const handleCreateOrg = async (payload) => {
+    const fn = onCreateOrganization || createOrganization;
+    await fn(payload);
+    onWorkspaceChanged?.();
+  };
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="cursor-default hover:bg-transparent active:bg-transparent">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                O
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <TypographyLarge className="truncate text-sm">Orbdyn</TypographyLarge>
-                <TypographyMuted className="truncate text-xs">{orgName}</TypographyMuted>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <ContextSwitcher
+          orgName={orgName}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onAllProjects={() => onNavigate('projects')}
+          onOpenPeople={() => onNavigate('people')}
+          onOpenSettings={() => onNavigate('settings')}
+          onSwitchWorkspace={handleSwitch}
+          onCreateOrganization={handleCreateOrg}
+        />
       </SidebarHeader>
 
       <SidebarContent>

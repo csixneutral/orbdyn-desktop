@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [user, setUser] = useState(null);
   const [orgName, setOrgName] = useState('Orbdyn Workspace');
+  const [workspaces, setWorkspaces] = useState([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [connectionError, setConnectionError] = useState(false);
   const [migrationNeeded, setMigrationNeeded] = useState(false);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -45,6 +47,8 @@ export function AuthProvider({ children }) {
         setMigrationNeeded(false);
         setSetupNeeded(false);
         setUser(null);
+        setWorkspaces([]);
+        setActiveWorkspaceId(null);
         return;
       }
 
@@ -52,6 +56,9 @@ export function AuthProvider({ children }) {
       setSetupNeeded(data.setupNeeded);
       setOrgName(data.orgName || 'Orbdyn Workspace');
       setUser(data.me || null);
+      setWorkspaces(data.workspaces || []);
+      const active = (data.workspaces || []).find((ws) => ws.active);
+      setActiveWorkspaceId(active?.id || null);
       setMigrationNeeded(false);
     } catch (err) {
       console.error('Failed to load bootstrap', err);
@@ -64,6 +71,8 @@ export function AuthProvider({ children }) {
       }
       setSetupNeeded(false);
       setUser(null);
+      setWorkspaces([]);
+      setActiveWorkspaceId(null);
     } finally {
       setLoading(false);
     }
@@ -82,7 +91,11 @@ export function AuthProvider({ children }) {
   const login = async (username, password) => {
     const res = await api.login({ username, password });
     setUser(res.user);
-    setSetupNeeded(false);
+    const boot = await api.getBootstrap();
+    setOrgName(boot.orgName || 'Orbdyn Workspace');
+    setWorkspaces(boot.workspaces || []);
+    const active = (boot.workspaces || []).find((ws) => ws.active);
+    setActiveWorkspaceId(active?.id || null);
     return res;
   };
 
@@ -91,12 +104,43 @@ export function AuthProvider({ children }) {
     setUser(res.user);
     if (res.orgName) setOrgName(res.orgName);
     setSetupNeeded(false);
+    const boot = await api.getBootstrap();
+    setWorkspaces(boot.workspaces || []);
+    const active = (boot.workspaces || []).find((ws) => ws.active);
+    setActiveWorkspaceId(active?.id || null);
+    return res;
+  };
+
+  const switchWorkspace = async (workspaceId) => {
+    const res = await api.switchWorkspace(workspaceId);
+    setUser(res.user);
+    setOrgName(res.orgName);
+    setActiveWorkspaceId(res.workspaceId);
+    setWorkspaces((prev) =>
+      prev.map((ws) => ({
+        ...ws,
+        active: ws.id === res.workspaceId,
+      }))
+    );
+    return res;
+  };
+
+  const createOrganization = async (payload) => {
+    const res = await api.createOrganization(payload);
+    setUser(res.user);
+    setOrgName(res.orgName);
+    setActiveWorkspaceId(res.workspaceId);
+    const { workspaces: nextWorkspaces } = await api.listWorkspaces();
+    setWorkspaces(nextWorkspaces || []);
     return res;
   };
 
   const logout = async () => {
     await api.logout();
     setUser(null);
+    setWorkspaces([]);
+    setActiveWorkspaceId(null);
+    await refreshBootstrap();
   };
 
   return (
@@ -106,12 +150,16 @@ export function AuthProvider({ children }) {
         setupNeeded,
         user,
         orgName,
+        workspaces,
+        activeWorkspaceId,
         connectionError,
         migrationNeeded,
         isOnline,
         login,
         setup,
         logout,
+        switchWorkspace,
+        createOrganization,
         refreshBootstrap,
         setUser,
       }}

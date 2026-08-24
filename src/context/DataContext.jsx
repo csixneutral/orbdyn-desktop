@@ -7,7 +7,7 @@ import { showNotification } from '@/lib/notify';
 const DataContext = createContext(null);
 
 export function DataProvider({ children }) {
-  const { user } = useAuth();
+  const { user, activeWorkspaceId } = useAuth();
 
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -61,7 +61,19 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     if (user) fetchAll();
-  }, [user, fetchAll]);
+    else {
+      setProjects([]);
+      setTasks([]);
+      setUsers([]);
+      setFiles([]);
+      setEvents([]);
+      setActivity([]);
+      setTrash([]);
+      setUnreadNotifications(0);
+      setNotificationList([]);
+      setDashboardData(null);
+    }
+  }, [user, activeWorkspaceId, fetchAll]);
 
   useEffect(() => {
     if (!user?.id) return;

@@ -5,13 +5,12 @@ import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { showNotification } from '@/lib/notify';
 import { AuthLayout } from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 
-export function LoginView({ onBack, onGetStarted, setupNeeded }) {
-  const { login, orgName } = useAuth();
+export function LoginView({ onBack, onGetStarted }) {
+  const { login } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -37,29 +36,22 @@ export function LoginView({ onBack, onGetStarted, setupNeeded }) {
   return (
     <AuthLayout
       onBack={onBack}
-      title="Welcome back"
-      description="Sign in with your email or username."
+      title="Sign in"
+      description="Use your username or email and password."
       icon={LogIn}
       footer={
-        setupNeeded && onGetStarted ? (
-          <p className="text-sm text-muted-foreground">
-            First time here?{' '}
-            <button type="button" className="font-medium text-primary hover:underline" onClick={onGetStarted}>
-              Create an account
-            </button>
-          </p>
-        ) : null
+        <p className="text-sm text-muted-foreground">
+          New to Orbdyn?{' '}
+          <button type="button" className="font-medium text-primary hover:underline" onClick={onGetStarted}>
+            Get started
+          </button>
+        </p>
       }
     >
       <Card className="border-primary/10 bg-card/95 shadow-xl backdrop-blur">
         <CardHeader className="space-y-2 pb-3 pt-5">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">Sign in</CardTitle>
-            <Badge variant="secondary" className="font-normal">
-              {orgName}
-            </Badge>
-          </div>
-          <CardDescription>Open your projects and team workspace.</CardDescription>
+          <CardTitle className="text-base">Your credentials</CardTitle>
+          <CardDescription>Sign in to open your projects and switch organizations from the sidebar.</CardDescription>
         </CardHeader>
         <CardContent className="pb-6">
           <form onSubmit={handleSubmit}>

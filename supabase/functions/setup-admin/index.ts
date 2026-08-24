@@ -50,10 +50,6 @@ Deno.serve(async (req) => {
       return json({ error: workspaceCountError.message }, 400);
     }
 
-    if ((count || 0) > 0) {
-      return json({ error: 'Orbdyn is already set up. Use Sign in instead.', code: 'ALREADY_SETUP' }, 409);
-    }
-
     const { orgName, name, username, password, email } = await req.json();
     if (!name || !username || !password || !email) {
       return json({ error: 'Name, username, email and password are required' }, 400);

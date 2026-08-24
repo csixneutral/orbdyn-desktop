@@ -10,7 +10,7 @@ import { NotificationsPopover } from './NotificationsPopover';
 import { useData } from '../context/DataContext';
 import { api } from '../api';
 
-export function HomeLayout({ currentView, onNavigate, children }) {
+export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, children }) {
   const { notificationList, unreadNotifications, refresh } = useData();
   const { theme, setTheme } = useTheme();
 
@@ -39,7 +39,7 @@ export function HomeLayout({ currentView, onNavigate, children }) {
 
   return (
     <SidebarProvider>
-      <AppSidebar currentView={currentView} onNavigate={onNavigate} />
+      <AppSidebar currentView={currentView} onNavigate={onNavigate} onWorkspaceChanged={onWorkspaceChanged} />
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />

@@ -114,7 +114,18 @@ async function getSessionProfile() {
   if (error || !row) throw new Error('Profile not found.');
   if (row.active === false) throw new Error('This account has been switched off.');
 
-  return { session, profile: mapProfile(row), row };
+  const workspaceId = row.active_workspace_id || row.workspace_id;
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('user_id', row.id)
+    .eq('workspace_id', workspaceId)
+    .maybeSingle();
+
+  const role = member?.role || row.role;
+  const scopedRow = { ...row, workspace_id: workspaceId, role };
+
+  return { session, profile: mapProfile(scopedRow), row: scopedRow };
 }
 
 function assertNotViewer(profile, message = 'Viewers cannot perform this action.') {
@@ -443,7 +454,7 @@ async function legacyClientSetup({ name, username, password, orgName, contactEma
     .maybeSingle();
 
   if (existingProfile) {
-    throw new Error('Your account is already set up. Use Sign in instead.');
+    throw new Error('Your account is already set up. Sign in and use Create organization to add another team.');
   }
 
   const { data: setupData, error: setupError } = await supabase.rpc('setup_workspace', {
@@ -491,10 +502,57 @@ export const api = {
       // keep public org name when logged out
     }
 
+    let workspaces = [];
+    try {
+      const { data: wsData, error: wsError } = await supabase.rpc('list_my_workspaces');
+      if (!wsError && Array.isArray(wsData)) workspaces = wsData;
+    } catch {
+      // RPC may not exist before migration 006
+    }
+
     return {
       setupNeeded,
       orgName,
       me,
+      workspaces,
+    };
+  },
+
+  listWorkspaces: async () => {
+    const { data, error } = await supabase.rpc('list_my_workspaces');
+    throwOnError(error, 'Could not load organizations.');
+    return { workspaces: data || [] };
+  },
+
+  switchWorkspace: async (workspaceId) => {
+    const { data, error } = await supabase.rpc('switch_active_workspace', {
+      p_workspace_id: workspaceId,
+    });
+    throwOnError(error, 'Could not switch organization.');
+    const { profile, row } = await getSessionProfile();
+    return {
+      workspaceId: data?.workspaceId || workspaceId,
+      orgName: data?.orgName || (await getWorkspaceOrgName(workspaceId)),
+      role: data?.role || profile.role,
+      user: profile,
+      row,
+    };
+  },
+
+  createOrganization: async (payload) => {
+    const { orgName } = payload || {};
+    if (!orgName?.trim()) throw new Error('Organization name is required.');
+
+    const { data, error } = await supabase.rpc('create_organization', {
+      p_org_name: String(orgName).trim(),
+    });
+    throwOnError(error, 'Could not create organization.');
+
+    const { profile } = await getSessionProfile();
+    return {
+      workspaceId: data.workspaceId,
+      orgName: data.orgName,
+      user: { ...profile, role: data.role || profile.role },
     };
   },
 
@@ -504,10 +562,6 @@ export const api = {
       throw new Error('Name, username and password are required.');
     }
     if (String(password).length < 6) throw new Error('Password must be at least 6 characters.');
-
-    const { data: boot, error: bootCheckError } = await supabase.rpc('public_bootstrap');
-    throwOnError(bootCheckError, 'Setup check failed');
-    if (!boot?.setupNeeded) throw new Error('Orbdyn is already set up. Use Sign in instead.');
 
     const uname = String(username).trim().toLowerCase();
     const contactEmail = email ? normalizeEmail(email) : '';
@@ -598,11 +652,10 @@ export const api = {
 
   // Users
   getUsers: async () => {
-    const { row } = await getSessionProfile();
+    await getSessionProfile();
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('workspace_id', row.workspace_id)
       .order('created_at', { ascending: true });
     throwOnError(error);
     return { users: (data || []).map(mapProfile) };

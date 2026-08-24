@@ -31,9 +31,10 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import { ContextSwitcher } from '@/components/sidebar/ContextSwitcher';
 import { cn } from '@/lib/utils';
-import { getBadgeStyle, getColorClasses } from '@/lib/colors';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 
 const AVATAR_COLORS = {
   blue: 'bg-blue-600 text-white',
@@ -54,37 +55,41 @@ const NAV_ITEMS = [
   { id: 'activity', label: 'Activity', icon: Activity },
 ];
 
-export function ProjectSidebar({ project, currentView, onNavigate, ...props }) {
-  const { user, logout } = useAuth();
+export function ProjectSidebar({
+  project,
+  projects,
+  currentView,
+  onNavigate,
+  onSelectProject,
+  onBackToProjects,
+  onOpenPeople,
+  onOpenSettings,
+  onCreateProject,
+  ...props
+}) {
+  const { user, logout, orgName } = useAuth();
+  const { projects: allProjects } = useData();
+  const projectList = projects ?? allProjects;
   const avatarColorClass = AVATAR_COLORS[user?.color] || AVATAR_COLORS.blue;
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="cursor-default hover:bg-transparent active:bg-transparent">
-              <div
-                className={cn(
-                  'flex aspect-square size-8 items-center justify-center rounded-lg text-sm font-semibold text-white',
-                  getColorClasses(project?.colour || 'blue', 'badge')
-                )}
-                style={getBadgeStyle(project?.colour)}
-              >
-                {project?.name ? project.name[0].toUpperCase() : 'P'}
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{project?.name || 'Project'}</span>
-                <span className="truncate text-xs text-muted-foreground">Project workspace</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <ContextSwitcher
+          orgName={orgName}
+          project={project}
+          projects={projectList}
+          onSelectProject={onSelectProject}
+          onAllProjects={onBackToProjects}
+          onOpenPeople={onOpenPeople}
+          onOpenSettings={onOpenSettings}
+          onCreateProject={onCreateProject}
+        />
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Project</SidebarGroupLabel>
+          <SidebarGroupLabel>Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {NAV_ITEMS.map((item) => {
@@ -128,7 +133,12 @@ export function ProjectSidebar({ project, currentView, onNavigate, ...props }) {
                   <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg" side="bottom" align="end" sideOffset={4}>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
                 <DropdownMenuLabel className="p-0 font-normal">
                   <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                     <Avatar className="h-8 w-8 rounded-lg">
