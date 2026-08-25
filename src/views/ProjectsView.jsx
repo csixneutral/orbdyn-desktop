@@ -28,6 +28,7 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '@/components/ui/typography';
 import { ProjectModal } from '../components/ProjectModal';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AVATAR_COLORS = {
   blue: '#3b82f6',
@@ -46,9 +47,45 @@ function getAvatarBg(color) {
   return AVATAR_COLORS[color] || AVATAR_COLORS.blue;
 }
 
+function ProjectCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <Skeleton className="h-6 w-32 rounded-full" />
+          <div className="flex gap-1">
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+          </div>
+        </div>
+
+        <Skeleton className="mb-2 h-4 w-full" />
+        <Skeleton className="mb-4 h-4 w-4/5" />
+
+        <div className="mb-4 space-y-2">
+          <div className="flex justify-between">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+          <Skeleton className="h-2 w-full rounded-full" />
+        </div>
+
+        <div className="flex items-center justify-between border-t pt-3">
+          <div className="flex -space-x-2">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-7 w-7 rounded-full border-2 border-background" />
+            ))}
+          </div>
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ProjectsView({ onOpenProject, openCreateOnMount = false, onCreateMountHandled }) {
   const { user } = useAuth();
-  const { projects, users, tasks, refresh } = useData();
+  const { projects, users, tasks, refresh, loading } = useData();
 
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -115,7 +152,13 @@ export function ProjectsView({ onOpenProject, openCreateOnMount = false, onCreat
           )}
         </PageHeader>
 
-        {projects.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }, (_, i) => (
+              <ProjectCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
           <Card className="p-8 text-center">
             <p className="mb-4 text-muted-foreground">
               No projects found. Create your first project to organize tasks and shared documents.

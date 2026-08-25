@@ -73,7 +73,10 @@ export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, dataLo
           </div>
         </header>
         <div className="relative flex flex-1 flex-col p-4">
-          <ApiLoadingOverlay loading={dataLoading} label="Loading workspace..." />
+          <ApiLoadingOverlay
+            loading={dataLoading && currentView !== 'projects'}
+            label="Loading workspace..."
+          />
           <div className="mx-auto w-full max-w-[1400px]">{children}</div>
         </div>
       </SidebarInset>
