@@ -53,7 +53,7 @@ function mapNotificationLink(link, tasks) {
 }
 
 export function App() {
-  const { loading, user, connectionError, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
+  const { loading, user, connectionError, connectionErrorReason, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
   const { tasks, projects } = useData();
 
   const [authScreen, setAuthScreen] = useState('welcome');
@@ -139,14 +139,17 @@ export function App() {
   }
 
   if (connectionError) {
+    const detail =
+      connectionErrorReason === 'missing_config'
+        ? 'This build is missing Supabase configuration. Reinstall from a GitHub Release built after adding VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY as repository secrets, or contact your administrator.'
+        : 'Check your internet connection and try again. If the problem continues, verify your Supabase project is online and the release was built with the correct GitHub secrets.';
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
             <TypographyH3 className="scroll-m-0">Cannot connect to Orbdyn</TypographyH3>
-            <TypographyMuted>
-              Check your internet connection and try again. If the problem continues, contact your workspace administrator.
-            </TypographyMuted>
+            <TypographyMuted>{detail}</TypographyMuted>
             <Button onClick={refreshBootstrap}>Try again</Button>
           </CardContent>
         </Card>

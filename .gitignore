@@ -9,6 +9,7 @@ public/assets/
 .env
 .env.*
 !.env.example
+.env.production
 *.pem
 *.key
 credentials.json

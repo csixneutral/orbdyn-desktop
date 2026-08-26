@@ -12,6 +12,7 @@ export function AuthProvider({ children }) {
   const [workspaces, setWorkspaces] = useState([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [connectionError, setConnectionError] = useState(false);
+  const [connectionErrorReason, setConnectionErrorReason] = useState('');
   const [migrationNeeded, setMigrationNeeded] = useState(false);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
 
@@ -41,9 +42,11 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setConnectionError(false);
+      setConnectionErrorReason('');
 
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
         setConnectionError(true);
+        setConnectionErrorReason('missing_config');
         setMigrationNeeded(false);
         setSetupNeeded(false);
         setUser(null);
@@ -65,8 +68,10 @@ export function AuthProvider({ children }) {
       if (err.code === 'MIGRATION_REQUIRED') {
         setMigrationNeeded(true);
         setConnectionError(false);
+        setConnectionErrorReason('');
       } else {
         setConnectionError(true);
+        setConnectionErrorReason('bootstrap_failed');
         setMigrationNeeded(false);
       }
       setSetupNeeded(false);
@@ -153,6 +158,7 @@ export function AuthProvider({ children }) {
         workspaces,
         activeWorkspaceId,
         connectionError,
+        connectionErrorReason,
         migrationNeeded,
         isOnline,
         login,

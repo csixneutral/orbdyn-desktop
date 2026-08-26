@@ -1,6 +1,6 @@
 {
   "name": "orbdyn",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Orbdyn — team workspace for tasks, documents, calendar and notifications. Powered by Supabase.",
   "main": "electron/main.js",
   "author": "Orbdyn",
@@ -10,7 +10,7 @@
     "prestart": "npm run build:ui",
     "start": "electron .",
     "dev": "node scripts/dev.mjs",
-    "build:ui": "vite build",
+    "build:ui": "node scripts/validate-build-env.mjs && vite build && node scripts/verify-build-bundle.mjs",
     "dev:ui": "vite",
     "build:win": "npm run build:ui && electron-builder --win",
     "build:mac": "npm run build:ui && electron-builder --mac",
