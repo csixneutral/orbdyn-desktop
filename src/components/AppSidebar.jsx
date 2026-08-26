@@ -1,5 +1,6 @@
 import React from 'react';
-import { Folder, Trash2, Users } from 'lucide-react';
+import { Download, Folder, RefreshCw, Trash2, Users } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Sidebar,
   SidebarContent,
@@ -18,6 +19,7 @@ import { ContextSwitcher } from '@/components/sidebar/ContextSwitcher';
 import { SidebarUserMenu } from '@/components/sidebar/SidebarUserMenu';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useAppUpdates } from './AppUpdatePrompt';
 
 const AVATAR_COLORS = {
   blue: 'bg-blue-600 text-white',
@@ -39,6 +41,21 @@ export function AppSidebar({ currentView, onNavigate, onSwitchWorkspace, onCreat
   const { user, logout, orgName, workspaces, activeWorkspaceId, switchWorkspace, createOrganization } = useAuth();
   const { trash } = useData();
   const avatarColorClass = AVATAR_COLORS[user?.color] || AVATAR_COLORS.blue;
+  const {
+    isDesktop,
+    checkStatus,
+    updateVersion,
+    downloadPercent,
+    runUpdate,
+  } = useAppUpdates();
+
+  const showUpdateButton = isDesktop && ['available', 'downloading', 'downloaded'].includes(checkStatus);
+  const updateLabel =
+    checkStatus === 'downloading'
+      ? `Updating ${downloadPercent}%`
+      : checkStatus === 'downloaded'
+        ? 'Restart to update'
+        : `Update${updateVersion ? ` v${updateVersion}` : ''}`;
 
   const handleSwitch = async (workspaceId) => {
     const fn = onSwitchWorkspace || switchWorkspace;
@@ -88,6 +105,25 @@ export function AppSidebar({ currentView, onNavigate, onSwitchWorkspace, onCreat
                   </SidebarMenuItem>
                 );
               })}
+              {showUpdateButton && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={runUpdate}
+                    disabled={checkStatus === 'downloading'}
+                    tooltip={updateLabel}
+                    className="text-primary hover:text-primary"
+                  >
+                    {checkStatus === 'downloading' ? (
+                      <Spinner className="h-4 w-4" />
+                    ) : checkStatus === 'downloaded' ? (
+                      <RefreshCw className="h-4 w-4" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    <span>{updateLabel}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

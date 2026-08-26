@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
-import { Cloud } from 'lucide-react';
+import { Cloud, Download, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,20 @@ import { PageHeader, TypographyH4, TypographyMuted, TypographySmall } from '@/co
 import { showNotification } from '@/lib/notify.js';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
+import { useAppUpdates } from '../components/AppUpdatePrompt';
 
 export function SettingsView() {
   const { user } = useAuth();
+  const {
+    isDesktop,
+    currentVersion,
+    checkStatus,
+    updateVersion,
+    downloadPercent,
+    errorMessage,
+    checkForUpdates,
+    runUpdate,
+  } = useAppUpdates();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [nextPassword, setNextPassword] = useState('');
@@ -61,6 +72,80 @@ export function SettingsView() {
           </Alert>
         </CardContent>
       </Card>
+
+      {isDesktop && (
+        <Card>
+          <CardContent className="space-y-4 p-4">
+            <TypographyH4 className="scroll-m-0 border-0 pb-0">Desktop App Updates</TypographyH4>
+            <TypographyMuted className="text-xs">
+              Installed version: {currentVersion || 'Unknown'}
+            </TypographyMuted>
+
+            {checkStatus === 'available' && (
+              <Alert>
+                <AlertTitle>Update available</AlertTitle>
+                <AlertDescription>
+                  Orbdyn {updateVersion} is ready to download.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {checkStatus === 'not-available' && (
+              <TypographyMuted className="text-sm">You are on the latest version.</TypographyMuted>
+            )}
+
+            {checkStatus === 'downloading' && (
+              <TypographyMuted className="text-sm">
+                Downloading update… {downloadPercent}%
+              </TypographyMuted>
+            )}
+
+            {checkStatus === 'downloaded' && (
+              <Alert>
+                <AlertTitle>Update downloaded</AlertTitle>
+                <AlertDescription>
+                  Orbdyn {updateVersion} is ready. Restart to install.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {checkStatus === 'error' && (
+              <TypographyMuted className="text-sm text-destructive">{errorMessage}</TypographyMuted>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={checkStatus === 'checking' || checkStatus === 'downloading'}
+                onClick={async () => {
+                  try {
+                    await checkForUpdates();
+                  } catch (err) {
+                    showNotification({ title: 'Update check failed', message: err.message, color: 'red' });
+                  }
+                }}
+              >
+                {checkStatus === 'checking' ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
+                Check for updates
+              </Button>
+
+              {checkStatus === 'downloaded' && (
+                <Button onClick={runUpdate}>
+                  <RefreshCw className="h-4 w-4" />
+                  Restart & install
+                </Button>
+              )}
+
+              {checkStatus === 'available' && (
+                <Button onClick={runUpdate}>
+                  <Download className="h-4 w-4" />
+                  Download & install
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-4">

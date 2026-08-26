@@ -7,6 +7,7 @@
 
 const { app, BrowserWindow, Tray, Menu, Notification, shell, dialog, nativeImage } = require('electron');
 const path = require('path');
+const { setupAutoUpdater } = require('./updater');
 
 app.setAppUserModelId('com.orbdyn.desktop');
 
@@ -147,6 +148,8 @@ if (!app.requestSingleInstanceLock()) {
       if (process.platform === 'darwin') app.dock.setBadge(count ? String(count) : '');
       if (win && win.setOverlayIcon) win.setOverlayIcon(null, count ? String(count) + ' unread' : '');
     });
+
+    setupAutoUpdater(() => win);
   });
 
   app.on('before-quit', () => { quitting = true; });
