@@ -126,25 +126,26 @@ export function useAppUpdates() {
 
 export function AppUpdatePrompt() {
   const { isDesktop, checkStatus, updateVersion, errorMessage, runUpdate } = useAppUpdates();
+  const [dismissed, setDismissed] = useState(false);
 
-  if (!isDesktop || checkStatus !== 'error') return null;
+  if (!isDesktop || checkStatus !== 'error' || dismissed) return null;
 
   return (
-    <Dialog open onOpenChange={() => {}}>
+    <Dialog open onOpenChange={(open) => !open && setDismissed(true)}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Update failed
+            Update check failed
           </DialogTitle>
           <DialogDescription>
-            Orbdyn could not install version {updateVersion || 'the latest update'}.
+            Orbdyn could not check for version {updateVersion || 'the latest update'}.
           </DialogDescription>
         </DialogHeader>
         <p className="text-sm text-destructive">{errorMessage}</p>
         <DialogFooter>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Close
+          <Button variant="outline" onClick={() => setDismissed(true)}>
+            Dismiss
           </Button>
           <Button onClick={runUpdate}>
             <RefreshCw className="h-4 w-4" />

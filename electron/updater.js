@@ -2,11 +2,20 @@ const { app, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
+let userInitiatedUpdate = false;
 
 function sendStatus(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('orbdyn:update-status', payload);
   }
+}
+
+function formatUpdateError(error) {
+  const message = error?.message || 'Update check failed';
+  if (/404|releases\.atom|authentication token/i.test(message)) {
+    return 'Could not reach the update server. Publish a GitHub Release for this app, or make the repository public.';
+  }
+  return message;
 }
 
 function setupAutoUpdater(getWindow) {
@@ -18,6 +27,7 @@ function setupAutoUpdater(getWindow) {
     if (!app.isPackaged) {
       return { status: 'dev', version: app.getVersion() };
     }
+    userInitiatedUpdate = true;
     try {
       const result = await autoUpdater.checkForUpdates();
       return {
@@ -25,15 +35,25 @@ function setupAutoUpdater(getWindow) {
         version: result?.updateInfo?.version || null,
       };
     } catch (error) {
-      sendStatus({ status: 'error', message: error?.message || 'Update check failed' });
+      sendStatus({ status: 'error', message: formatUpdateError(error) });
       throw error;
+    } finally {
+      userInitiatedUpdate = false;
     }
   });
 
   ipcMain.handle('orbdyn:download-update', async () => {
     if (!app.isPackaged) return { status: 'dev' };
-    await autoUpdater.downloadUpdate();
-    return { status: 'downloading' };
+    userInitiatedUpdate = true;
+    try {
+      await autoUpdater.downloadUpdate();
+      return { status: 'downloading' };
+    } catch (error) {
+      sendStatus({ status: 'error', message: formatUpdateError(error) });
+      throw error;
+    } finally {
+      userInitiatedUpdate = false;
+    }
   });
 
   ipcMain.handle('orbdyn:install-update', () => {
@@ -48,6 +68,7 @@ function setupAutoUpdater(getWindow) {
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoRunAppAfterInstall = true;
 
   autoUpdater.on('checking-for-update', () => {
     sendStatus({ status: 'checking' });
@@ -85,18 +106,26 @@ function setupAutoUpdater(getWindow) {
   });
 
   autoUpdater.on('error', (error) => {
+    if (!userInitiatedUpdate) {
+      console.warn('[orbdyn] Background update check failed:', error?.message || error);
+      return;
+    }
     sendStatus({
       status: 'error',
-      message: error?.message || 'Update check failed',
+      message: formatUpdateError(error),
     });
   });
 
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
+    autoUpdater.checkForUpdates().catch((error) => {
+      console.warn('[orbdyn] Background update check failed:', error?.message || error);
+    });
   }, 8000);
 
   setInterval(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
+    autoUpdater.checkForUpdates().catch((error) => {
+      console.warn('[orbdyn] Background update check failed:', error?.message || error);
+    });
   }, 4 * 60 * 60 * 1000);
 }
 
