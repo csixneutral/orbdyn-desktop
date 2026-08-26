@@ -4,17 +4,15 @@ import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ProjectSidebar } from './ProjectSidebar';
 import { NotificationsPopover } from './NotificationsPopover';
-import { ApiLoadingOverlay } from '@/components/ui/loading-overlay';
+import { cn } from '@/lib/utils';
 import { useData } from '../context/DataContext';
 import { api } from '../api';
 
 export function ProjectWorkspaceLayout({
   project,
   projects,
-  dataLoading,
   currentView,
   onNavigate,
   onBackToProjects,
@@ -69,23 +67,18 @@ export function ProjectWorkspaceLayout({
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                >
-                  {theme === 'dark' ? (
-                    <Sun className="h-[18px] w-[18px] text-amber-500" />
-                  ) : (
-                    <Moon className="h-[18px] w-[18px] text-blue-500" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
-            </Tooltip>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-[18px] w-[18px] text-amber-500" />
+              ) : (
+                <Moon className="h-[18px] w-[18px] text-blue-500" />
+              )}
+            </Button>
             <NotificationsPopover
               notificationList={notificationList}
               unreadNotifications={unreadNotifications}
@@ -95,8 +88,12 @@ export function ProjectWorkspaceLayout({
           </div>
         </header>
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <ApiLoadingOverlay loading={dataLoading} label="Loading workspace..." />
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div
+            className={cn(
+              'min-h-0 flex-1 p-4',
+              currentView === 'tasks' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
+            )}
+          >
             {children}
           </div>
         </div>

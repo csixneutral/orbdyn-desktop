@@ -12,9 +12,13 @@ import {
   Link,
   AlertTriangle,
   ChevronsUpDown,
+  CalendarDays,
+  Flag,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -40,14 +44,117 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { showNotification } from '@/lib/notify.js';
 import { copyFileDownloadLink, downloadFile, loadFilePreviewUrl } from '@/lib/files';
-import { getColorClasses } from '@/lib/colors';
+import { getColorClasses, getProgressStyle } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { TaskModal } from '../components/TaskModal';
+import {
+  TASK_STATUS_COLUMNS,
+  canChangeTaskStatus,
+  getAllowedTaskStatuses,
+  getStatusChangeBlockedMessage,
+} from '@/lib/task-status';
+import { canCreateContent, canChangeTaskAssignees, canProcessTasks } from '@/lib/roles';
 
-function AssigneeMultiSelect({ options, value, onChange }) {
+const TASK_STATUSES = TASK_STATUS_COLUMNS;
+
+function TaskDetailSkeleton({ onBack }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back to Tasks
+        </Button>
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-8 w-20" />
+        </div>
+      </div>
+
+      <Card className="overflow-hidden">
+        <Skeleton className="h-1 w-full rounded-none" />
+        <CardContent className="p-0">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Skeleton className="h-5 w-14" />
+                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+              <Skeleton className="h-8 w-2/3" />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-6 w-6 rounded-full" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+            </div>
+            <Skeleton className="h-16 w-20 rounded-lg" />
+          </div>
+
+          <div className="space-y-2 border-b px-6 py-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
+
+          <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="space-y-2 bg-card p-4">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-8" />
+            </div>
+            <Skeleton className="h-2.5 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-8 w-36" />
+          </div>
+          <Skeleton className="h-4 w-72" />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6">
+          <Skeleton className="mb-4 h-4 w-24" />
+          <Skeleton className="mb-6 h-4 w-32" />
+          <Skeleton className="h-20 w-full" />
+          <div className="mt-3 flex justify-end">
+            <Skeleton className="h-9 w-20" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function TaskDetailField({ icon: Icon, label, children, className }) {
+  return (
+    <div className={cn('space-y-2 bg-card p-4', className)}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {Icon && <Icon className="h-3.5 w-3.5" />}
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function AssigneeMultiSelect({ options, value, onChange, users = [] }) {
   const [open, setOpen] = useState(false);
 
   const toggle = (id) => {
@@ -58,48 +165,56 @@ function AssigneeMultiSelect({ options, value, onChange }) {
     }
   };
 
-  const selectedLabels = options.filter((o) => value.includes(o.value)).map((o) => o.label);
+  const selectedOptions = options.filter((o) => value.includes(o.value));
 
   return (
-    <div className="min-w-[220px] flex-1 space-y-1.5">
-      <Label>Awarded to</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" className="h-9 w-full justify-between font-normal">
-            <span className="truncate">
-              {selectedLabels.length > 0 ? selectedLabels.join(', ') : 'Assign to...'}
-            </span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[280px] p-2" align="start">
-          <div className="max-h-[240px] space-y-1 overflow-y-auto">
-            {options.map((opt) => (
-              <label
-                key={opt.value}
-                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
-              >
-                <Checkbox checked={value.includes(opt.value)} onCheckedChange={() => toggle(opt.value)} />
-                <span className="text-sm">{opt.label}</span>
-              </label>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {selectedLabels.map((label) => (
-            <Badge
-              key={label}
-              variant="secondary"
-              className="border border-emerald-500/35 bg-emerald-500/15 font-semibold text-emerald-400"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" className="h-9 w-full justify-between font-normal">
+          <span className="flex min-w-0 items-center gap-2 truncate">
+            {selectedOptions.length > 0 ? (
+              <>
+                <span className="flex -space-x-2">
+                  {selectedOptions.slice(0, 3).map((opt) => {
+                    const user = users.find((u) => u.id === opt.value);
+                    return (
+                      <Avatar key={opt.value} className="h-6 w-6 border-2 border-background">
+                        <AvatarFallback
+                          className={cn('text-[10px]', getColorClasses(user?.color || 'blue', 'avatar'))}
+                        >
+                          {opt.label[0]?.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    );
+                  })}
+                </span>
+                <span className="truncate text-sm">
+                  {selectedOptions.length === 1
+                    ? selectedOptions[0].label
+                    : `${selectedOptions.length} people`}
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">Assign to...</span>
+            )}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-2" align="start">
+        <div className="max-h-[240px] space-y-1 overflow-y-auto">
+          {options.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
             >
-              {label}
-            </Badge>
+              <Checkbox checked={value.includes(opt.value)} onCheckedChange={() => toggle(opt.value)} />
+              <span className="text-sm">{opt.label}</span>
+            </label>
           ))}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -121,19 +236,24 @@ export function TaskDetailView({ taskId, onBack }) {
 
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadDetails = async () => {
     if (!taskId) return;
+    setLoading(true);
     try {
       const { tasks } = await api.getTasks();
       const t = tasks.find((item) => item.id === taskId);
-      if (t) setTask(t);
+      setTask(t || null);
       const { files } = await api.getFiles({ taskId });
       setTaskFiles(files || []);
       const { comments: cList } = await api.getComments({ taskId });
       setComments(cList || []);
     } catch (err) {
       console.error(err);
+      setTask(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -182,6 +302,10 @@ export function TaskDetailView({ taskId, onBack }) {
     }
   };
 
+  if (loading) {
+    return <TaskDetailSkeleton onBack={onBack} />;
+  }
+
   if (!task) {
     return (
       <div className="flex flex-col gap-4">
@@ -189,7 +313,7 @@ export function TaskDetailView({ taskId, onBack }) {
           <ArrowLeft className="h-4 w-4" />
           Back to Tasks
         </Button>
-        <p className="text-sm text-muted-foreground">Loading task details...</p>
+        <p className="text-sm text-muted-foreground">Task not found.</p>
       </div>
     );
   }
@@ -202,17 +326,42 @@ export function TaskDetailView({ taskId, onBack }) {
       ? [task.assigneeId]
       : [];
 
+  const isAssignableUser = (person) =>
+    person?.active !== false && person?.role !== 'admin' && person?.id !== user?.id;
+
   const assigneeOptions = (() => {
+    let pool = users.filter(isAssignableUser);
+
     if (project && project.visibility === 'members') {
       const allowedIds = new Set([project.ownerId, ...(project.memberIds || [])]);
-      return users
-        .filter((u) => u.active !== false && allowedIds.has(u.id))
-        .map((u) => ({ value: u.id, label: u.name }));
+      pool = pool.filter((u) => allowedIds.has(u.id));
     }
-    return users.filter((u) => u.active !== false).map((u) => ({ value: u.id, label: u.name }));
+
+    return pool.map((u) => ({ value: u.id, label: u.name }));
   })();
 
+  const visibleAssigneeIds = currentAssigneeIds.filter((id) =>
+    assigneeOptions.some((opt) => opt.value === id)
+  );
+
   const handleStatusChange = async (newStatus) => {
+    if (
+      !canChangeTaskStatus({
+        user,
+        task,
+        project,
+        fromStatus: task.status,
+        toStatus: newStatus,
+      })
+    ) {
+      showNotification({
+        title: 'Not allowed',
+        message: getStatusChangeBlockedMessage(),
+        color: 'red',
+      });
+      return;
+    }
+
     try {
       const progressVal = newStatus === 'done' ? 100 : task.progress;
       await api.updateTask(task.id, { status: newStatus, progress: progressVal });
@@ -229,10 +378,14 @@ export function TaskDetailView({ taskId, onBack }) {
   };
 
   const handleAssigneesChange = async (newAssigneeIds) => {
+    const filteredAssigneeIds = newAssigneeIds.filter((id) =>
+      assigneeOptions.some((opt) => opt.value === id)
+    );
+
     try {
       await api.updateTask(task.id, {
-        assigneeIds: newAssigneeIds,
-        assigneeId: newAssigneeIds[0] || null,
+        assigneeIds: filteredAssigneeIds,
+        assigneeId: filteredAssigneeIds[0] || null,
       });
       showNotification({ title: 'Updated', message: 'Assignees updated', color: 'green' });
       loadDetails();
@@ -303,6 +456,11 @@ export function TaskDetailView({ taskId, onBack }) {
   const priorityColor =
     task.priority === 'urgent' ? 'red' : task.priority === 'high' ? 'orange' : 'blue';
 
+  const allowedStatuses = getAllowedTaskStatuses({ user, task, project });
+  const statusMeta = TASK_STATUSES.find((s) => s.id === task.status) || TASK_STATUSES[0];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isOverdue = task.dueDate && task.dueDate < todayStr && task.status !== 'done';
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -325,63 +483,141 @@ export function TaskDetailView({ taskId, onBack }) {
         )}
       </div>
 
-      <Card>
-        <CardContent className="space-y-4 p-6">
-          <div>
-            <h2 className="text-2xl font-bold">{task.title}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {task.ref} • created {new Date(task.createdAt).toLocaleDateString()} by{' '}
-              {creator?.name || 'Unknown'}
-            </p>
+      <Card className="overflow-hidden">
+        <div className={cn('h-1 w-full', getColorClasses(statusMeta.color, 'progress'))} />
+
+        <CardContent className="p-0">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-5">
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="font-mono text-[11px] font-semibold tracking-wide">
+                  {task.ref}
+                </Badge>
+                <Badge
+                  className={cn('border-transparent text-white', getColorClasses(statusMeta.color, 'badge'))}
+                >
+                  {statusMeta.title}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={cn('gap-1 border-transparent', getColorClasses(priorityColor, 'light'))}
+                >
+                  <Flag className="h-3 w-3" />
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                </Badge>
+              </div>
+
+              <h2 className="text-2xl font-bold tracking-tight">{task.title}</h2>
+
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback
+                    className={cn('text-[10px]', getColorClasses(creator?.color || 'blue', 'avatar'))}
+                  >
+                    {creator?.name ? creator.name[0].toUpperCase() : '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <span>
+                  Created {new Date(task.createdAt).toLocaleDateString()} by{' '}
+                  <span className="font-medium text-foreground">{creator?.name || 'Unknown'}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 px-4 py-3 text-center">
+              <p className="text-3xl font-bold tabular-nums leading-none">{task.progress}%</p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Progress
+              </p>
+            </div>
           </div>
 
           {task.description && (
-            <Card className="bg-muted/30 shadow-none">
-              <CardContent className="p-4">
-                <p className="text-sm">{task.description}</p>
-              </CardContent>
-            </Card>
+            <div className="border-b px-6 py-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Description
+              </p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                {task.description}
+              </p>
+            </div>
           )}
 
-          <div className="flex flex-wrap items-end gap-6">
-            <div className="w-[160px] space-y-1.5">
-              <Label>Status</Label>
+          <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+            <TaskDetailField label="Status">
               <Select value={task.status} onValueChange={handleStatusChange}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todo">To Do</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="review">In Review</SelectItem>
-                  <SelectItem value="done">Done</SelectItem>
-                  <SelectItem value="blocked">Blocked</SelectItem>
+                  {allowedStatuses.map((status) => (
+                    <SelectItem key={status.id} value={status.id}>
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={cn('h-2 w-2 rounded-full', getColorClasses(status.color, 'progress'))}
+                        />
+                        {status.title}
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-            </div>
+            </TaskDetailField>
 
-            <AssigneeMultiSelect
-              options={assigneeOptions}
-              value={currentAssigneeIds}
-              onChange={handleAssigneesChange}
-            />
+            <TaskDetailField icon={Users} label="Assigned to">
+              {canChangeTaskAssignees(user) ? (
+                <AssigneeMultiSelect
+                  options={assigneeOptions}
+                  value={visibleAssigneeIds}
+                  onChange={handleAssigneesChange}
+                  users={users}
+                />
+              ) : (
+                <div className="flex h-9 items-center rounded-md border bg-background px-3 text-sm">
+                  {visibleAssigneeIds.length
+                    ? visibleAssigneeIds
+                        .map((id) => users.find((u) => u.id === id)?.name)
+                        .filter(Boolean)
+                        .join(', ')
+                    : 'Unassigned'}
+                </div>
+              )}
+            </TaskDetailField>
 
-            <div>
-              <p className="mb-1 text-xs font-semibold text-muted-foreground">Priority</p>
-              <Badge className={cn('border-transparent text-white', getColorClasses(priorityColor, 'badge'))}>
-                {task.priority.toUpperCase()}
+            <TaskDetailField icon={CalendarDays} label="Due date">
+              <div
+                className={cn(
+                  'flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium',
+                  isOverdue ? 'border-destructive/40 text-destructive' : 'text-foreground'
+                )}
+              >
+                {task.dueDate || 'No due date'}
+              </div>
+            </TaskDetailField>
+
+            <TaskDetailField icon={Flag} label="Priority">
+              <Badge
+                className={cn(
+                  'h-9 w-full justify-center border-transparent px-3 text-sm font-semibold text-white',
+                  getColorClasses(priorityColor, 'badge')
+                )}
+              >
+                {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
               </Badge>
-            </div>
-
-            <div>
-              <p className="mb-1 text-xs font-semibold text-muted-foreground">Due</p>
-              <span className="text-sm font-semibold">{task.dueDate || 'No due date'}</span>
-            </div>
+            </TaskDetailField>
           </div>
 
-          <div className="space-y-1">
-            <p className="text-xs font-semibold text-muted-foreground">Progress — {task.progress}%</p>
-            <Progress value={task.progress} className="h-2.5" />
+          <div className="space-y-2 px-6 py-4">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <span>Completion</span>
+              <span className="tabular-nums">{task.progress}%</span>
+            </div>
+            <Progress
+              value={task.progress}
+              className="h-2.5"
+              indicatorClassName={getColorClasses(statusMeta.color, 'progress')}
+              indicatorStyle={getProgressStyle(statusMeta.color)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -390,7 +626,7 @@ export function TaskDetailView({ taskId, onBack }) {
         <CardContent className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-bold uppercase text-muted-foreground">Attached Documents</p>
-            {user?.role !== 'viewer' && (
+            {canCreateContent(user) && (
               <Button variant="outline" size="sm" onClick={() => setUploadModalOpened(true)}>
                 <Paperclip className="h-4 w-4" />
                 Attach a document
@@ -488,7 +724,8 @@ export function TaskDetailView({ taskId, onBack }) {
             )}
           </div>
 
-          <form onSubmit={handleAddComment}>
+          {canProcessTasks(user) && (
+            <form onSubmit={handleAddComment}>
             <div className="space-y-2">
               <Textarea
                 placeholder="Write a message... everyone involved gets a notification."
@@ -504,6 +741,7 @@ export function TaskDetailView({ taskId, onBack }) {
               </div>
             </div>
           </form>
+          )}
         </CardContent>
       </Card>
 

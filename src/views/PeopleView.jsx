@@ -13,6 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,19 @@ import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '@/components/ui/typography';
 import { UserModal } from '../components/UserModal';
+import {
+  ROLE_OPTIONS,
+  getRoleShortLabel,
+  normalizeRole,
+} from '@/lib/roles';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox';
 
 const AVATAR_COLORS = {
   blue: '#3b82f6',
@@ -50,23 +64,33 @@ function getAvatarBg(color) {
 function roleBadgeVariant(role) {
   if (role === 'admin') return 'default';
   if (role === 'viewer') return 'secondary';
+  if (role === 'member') return 'outline';
   return 'outline';
 }
+
+const ROLE_COMBO_ITEMS = ROLE_OPTIONS.map((option) => getRoleShortLabel(option.value));
 
 export function PeopleView({ projectId }) {
   const { user } = useAuth();
   const { users, projects, refresh } = useData();
 
   const project = projectId ? projects.find((p) => p.id === projectId) : null;
-  const visibleUsers = project
-    ? users.filter((u) => u.id === project.ownerId || (project.memberIds || []).includes(u.id))
-    : users;
+  const visibleUsers = (
+    project
+      ? users.filter((u) => u.id === project.ownerId || (project.memberIds || []).includes(u.id))
+      : users
+  ).filter((u) => projectId || u.id !== user?.id);
 
   const [modalOpened, setModalOpened] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState(null);
+  const [updatingActiveUserId, setUpdatingActiveUserId] = useState(null);
+
+  const canManagePeople = user?.role === 'admin' && !projectId;
+  const canManageRoles = canManagePeople;
 
   const handleOpenCreate = () => {
     setSelectedUser(null);
@@ -103,6 +127,48 @@ export function PeopleView({ projectId }) {
     }
   };
 
+  const handleRoleChange = async (person, nextRole) => {
+    const currentRole = normalizeRole(person.role);
+    const normalizedNextRole = normalizeRole(nextRole);
+    if (currentRole === normalizedNextRole) return;
+
+    try {
+      setUpdatingRoleUserId(person.id);
+      const { user: updatedUser } = await api.updateUser(person.id, { role: normalizedNextRole });
+      const savedRole = normalizeRole(updatedUser?.role || normalizedNextRole);
+      showNotification({
+        title: 'Role updated',
+        message: `${person.name} is now ${getRoleShortLabel(savedRole)}`,
+        color: 'green',
+      });
+      refresh();
+    } catch (err) {
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
+  };
+
+  const handleActiveChange = async (person, nextActive) => {
+    const currentActive = person.active !== false;
+    if (currentActive === nextActive) return;
+
+    try {
+      setUpdatingActiveUserId(person.id);
+      await api.updateUser(person.id, { active: nextActive });
+      showNotification({
+        title: 'Status updated',
+        message: `${person.name} is now ${nextActive ? 'Active' : 'Switched Off'}`,
+        color: 'green',
+      });
+      refresh();
+    } catch (err) {
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
+    } finally {
+      setUpdatingActiveUserId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -113,7 +179,7 @@ export function PeopleView({ projectId }) {
             : 'Workspace members, roles, and access credentials'
         }
       >
-        {user?.role === 'admin' && !projectId && (
+        {canManagePeople && (
           <Button onClick={handleOpenCreate}>
             <UserPlus className="h-4 w-4" />
             Add Person
@@ -131,13 +197,11 @@ export function PeopleView({ projectId }) {
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Joined Date</TableHead>
-              {user?.role === 'admin' && !projectId && <TableHead>Actions</TableHead>}
+              {canManagePeople && <TableHead>Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {[...visibleUsers]
-              .sort((a, b) => (a.id === user?.id ? -1 : b.id === user?.id ? 1 : 0))
-              .map((u) => (
+            {visibleUsers.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -162,20 +226,77 @@ export function PeopleView({ projectId }) {
                     <span className="text-sm">{u.email || '-'}</span>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={roleBadgeVariant(u.role)}>{u.role}</Badge>
+                    {canManageRoles ? (
+                      <Combobox
+                        items={ROLE_COMBO_ITEMS}
+                        value={getRoleShortLabel(u.role)}
+                        disabled={updatingRoleUserId === u.id}
+                        onValueChange={(label) => {
+                          const option = ROLE_OPTIONS.find(
+                            (item) => getRoleShortLabel(item.value) === label
+                          );
+                          if (option) handleRoleChange(u, option.value);
+                        }}
+                      >
+                        <ComboboxInput
+                          placeholder="Select role"
+                          loading={updatingRoleUserId === u.id}
+                          className="h-8 w-[132px] font-normal"
+                        />
+                        <ComboboxContent>
+                          <ComboboxEmpty>No role found.</ComboboxEmpty>
+                          <ComboboxList>
+                            {(item) => {
+                              const option = ROLE_OPTIONS.find(
+                                (roleOption) => getRoleShortLabel(roleOption.value) === item
+                              );
+                              return (
+                                <ComboboxItem key={item} value={item}>
+                                  <span className="flex flex-col items-start gap-0.5">
+                                    <span>{item}</span>
+                                    {option ? (
+                                      <span className="text-xs text-muted-foreground">{option.label}</span>
+                                    ) : null}
+                                  </span>
+                                </ComboboxItem>
+                              );
+                            }}
+                          </ComboboxList>
+                        </ComboboxContent>
+                      </Combobox>
+                    ) : (
+                      <Badge variant={roleBadgeVariant(u.role)}>{getRoleShortLabel(u.role)}</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={u.active !== false ? 'default' : 'destructive'}
-                      className={u.active !== false ? 'bg-emerald-600 hover:bg-emerald-600' : undefined}
-                    >
-                      {u.active !== false ? 'Active' : 'Switched Off'}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={u.active !== false}
+                        disabled={
+                          !canManagePeople ||
+                          updatingActiveUserId === u.id ||
+                          u.id === user?.id
+                        }
+                        onCheckedChange={(checked) => handleActiveChange(u, checked)}
+                        aria-label={`${u.name} account active`}
+                      />
+                      {updatingActiveUserId === u.id ? (
+                        <Spinner className="h-4 w-4" />
+                      ) : (
+                        <span
+                          className={`text-sm ${
+                            u.active !== false ? 'text-foreground' : 'text-muted-foreground'
+                          }`}
+                        >
+                          {u.active !== false ? 'Active' : 'Off'}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <span className="text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>
                   </TableCell>
-                  {user?.role === 'admin' && !projectId && (
+                  {canManagePeople && (
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(u)}>

@@ -54,22 +54,38 @@ import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '@/components/ui/typography';
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from '@/components/ui/combobox';
 import { TaskModal } from '../components/TaskModal';
 import { TaskDetailView } from './TaskDetailView';
+import {
+  TASK_STATUS_COLUMNS,
+  canChangeTaskStatus,
+  canUpdateTaskStatus,
+  getAllowedTaskStatuses,
+  getStatusChangeBlockedMessage,
+} from '@/lib/task-status';
+import { canCreateContent, canDragTask, canEditTaskDetails } from '@/lib/roles';
 
-const COLUMNS = [
-  { id: 'todo', title: 'To Do', color: 'gray' },
-  { id: 'in_progress', title: 'In Progress', color: 'blue' },
-  { id: 'review', title: 'In Review', color: 'yellow' },
-  { id: 'done', title: 'Done', color: 'green' },
-  { id: 'blocked', title: 'Blocked', color: 'red' },
-];
+const COLUMNS = TASK_STATUS_COLUMNS;
 
 function sortTasksByOrder(a, b) {
   if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
   if (a.order !== undefined) return -1;
   if (b.order !== undefined) return 1;
   return (a.createdAt || '').localeCompare(b.createdAt || '');
+}
+
+function formatEstimateHours(hours) {
+  const value = Number(hours) || 0;
+  if (value <= 0) return '-';
+  return value === 1 ? '1 hr' : `${value} hrs`;
 }
 
 export function TasksView({ initialTaskId, projectId }) {
@@ -97,6 +113,7 @@ export function TasksView({ initialTaskId, projectId }) {
   const [deleteModalOpened, setDeleteModalOpened] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState(null);
 
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverTaskId, setDragOverTaskId] = useState(null);
@@ -115,6 +132,30 @@ export function TasksView({ initialTaskId, projectId }) {
 
       const sourceColumnId = taskToMove.status;
       const isSameColumn = sourceColumnId === targetColumnId;
+
+      if (!isSameColumn) {
+        const project = projects.find((p) => p.id === taskToMove.projectId);
+        if (
+          !canChangeTaskStatus({
+            user,
+            task: taskToMove,
+            project,
+            fromStatus: sourceColumnId,
+            toStatus: targetColumnId,
+          })
+        ) {
+          showNotification({
+            title: 'Not allowed',
+            message: getStatusChangeBlockedMessage(),
+            color: 'red',
+          });
+          draggedTaskIdRef.current = null;
+          setDraggedTaskId(null);
+          setDragOverTaskId(null);
+          setDragOverColumnId(null);
+          return;
+        }
+      }
 
       try {
         const colTitle = COLUMNS.find((c) => c.id === targetColumnId)?.title || targetColumnId;
@@ -181,11 +222,15 @@ export function TasksView({ initialTaskId, projectId }) {
         setDragOverColumnId(null);
       }
     },
-    [tasks, draggedTaskId, refresh]
+    [tasks, draggedTaskId, refresh, projects, user]
   );
 
   if (activeTaskId) {
-    return <TaskDetailView taskId={activeTaskId} onBack={() => setActiveTaskId(null)} />;
+    return (
+      <div className="h-full min-h-0 overflow-y-auto">
+        <TaskDetailView taskId={activeTaskId} onBack={() => setActiveTaskId(null)} />
+      </div>
+    );
   }
 
   const filteredTasks = tasks.filter((t) => {
@@ -237,16 +282,57 @@ export function TasksView({ initialTaskId, projectId }) {
     }
   };
 
+  const canUpdateTaskStatusForUser = (task) => canUpdateTaskStatus(user, task);
+
+  const handleStatusChange = async (task, newStatusId) => {
+    if (!newStatusId || task.status === newStatusId) return;
+
+    const project = projects.find((p) => p.id === task.projectId);
+    if (
+      !canChangeTaskStatus({
+        user,
+        task,
+        project,
+        fromStatus: task.status,
+        toStatus: newStatusId,
+      })
+    ) {
+      showNotification({
+        title: 'Not allowed',
+        message: getStatusChangeBlockedMessage(),
+        color: 'red',
+      });
+      return;
+    }
+
+    try {
+      setUpdatingStatusTaskId(task.id);
+      const progressVal = newStatusId === 'done' ? 100 : task.progress;
+      await api.updateTask(task.id, { status: newStatusId, progress: progressVal });
+      const statusTitle = COLUMNS.find((col) => col.id === newStatusId)?.title || newStatusId;
+      showNotification({
+        title: 'Status updated',
+        message: `"${task.title}" is now ${statusTitle}`,
+        color: 'green',
+      });
+      refresh();
+    } catch (err) {
+      showNotification({ title: 'Error', message: err.message, color: 'red' });
+    } finally {
+      setUpdatingStatusTaskId(null);
+    }
+  };
+
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <TooltipProvider>
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex h-full min-h-0 flex-col gap-4 overflow-hidden">
         <PageHeader
           title="Tasks"
           description="Track progress, assign tasks, and drag cards to reorder or change status"
         >
-          {user?.role !== 'viewer' && (
+          {canCreateContent(user) && (
             <Button onClick={handleOpenCreate}>
               <Plus className="h-4 w-4" />
               New Task
@@ -314,21 +400,21 @@ export function TasksView({ initialTaskId, projectId }) {
           </div>
         </div>
 
-        <Tabs defaultValue="kanban" className="flex min-h-0 flex-1 flex-col">
+        <Tabs defaultValue="list" className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <TabsList className="mb-2 shrink-0">
-            <TabsTrigger value="kanban">
-              <LayoutGrid className="h-4 w-4" />
-              Board View
-            </TabsTrigger>
             <TabsTrigger value="list">
               <List className="h-4 w-4" />
               List View
             </TabsTrigger>
+            <TabsTrigger value="kanban">
+              <LayoutGrid className="h-4 w-4" />
+              Board View
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="kanban" className="mt-0 -mx-4 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden">
+          <TabsContent value="kanban" className="mt-0 -mx-4 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden">
             <div className="flex min-h-0 flex-1 overflow-x-auto overflow-y-hidden scroll-smooth px-4 pb-2">
-              <div className="flex h-full min-h-[360px] w-max gap-4">
+              <div className="flex h-full min-h-0 w-max gap-4">
               {COLUMNS.map((col) => {
                 const colTasks = filteredTasks.filter((t) => t.status === col.id).sort(sortTasksByOrder);
                 const isColumnHovered = dragOverColumnId === col.id;
@@ -391,7 +477,7 @@ export function TasksView({ initialTaskId, projectId }) {
                             return (
                               <Card
                                 key={task.id}
-                                draggable={user?.role !== 'viewer'}
+                                draggable={canDragTask(user, task)}
                                 onDragStart={(e) => {
                                   e.stopPropagation();
                                   didDragRef.current = false;
@@ -432,7 +518,7 @@ export function TasksView({ initialTaskId, projectId }) {
                                 }}
                                 className={cn(
                                   'cursor-pointer shadow-sm transition-all',
-                                  user?.role !== 'viewer' && 'cursor-grab active:cursor-grabbing',
+                                  canDragTask(user, task) && 'cursor-grab active:cursor-grabbing',
                                   isDraggingThis && 'opacity-40',
                                   isDragOverThis && 'border-2 border-primary bg-primary/10'
                                 )}
@@ -444,7 +530,7 @@ export function TasksView({ initialTaskId, projectId }) {
                                 <CardContent className="p-3">
                                   <div className="mb-1 flex items-center justify-between">
                                     <div className="flex items-center gap-1">
-                                      {user?.role !== 'viewer' && (
+                                      {canDragTask(user, task) && (
                                         <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                       )}
                                       <span className="text-xs font-bold text-muted-foreground">{task.ref}</span>
@@ -520,19 +606,18 @@ export function TasksView({ initialTaskId, projectId }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Ref</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Assignee</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Progress</TableHead>
-                    <TableHead>Due Date</TableHead>
+                    <TableHead>Due / Hours</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTasks.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                         No tasks found.
                       </TableCell>
                     </TableRow>
@@ -540,6 +625,10 @@ export function TasksView({ initialTaskId, projectId }) {
                     filteredTasks.map((t) => {
                       const assignee = users.find((u) => u.id === t.assigneeId);
                       const statusCol = COLUMNS.find((c) => c.id === t.status);
+                      const project = projects.find((p) => p.id === t.projectId);
+                      const allowedStatuses = getAllowedTaskStatuses({ user, task: t, project });
+                      const allowedStatusItems = allowedStatuses.map((col) => col.title);
+                      const canEditStatus = canUpdateTaskStatusForUser(t) && allowedStatusItems.length > 1;
                       return (
                         <TableRow
                           key={t.id}
@@ -547,21 +636,60 @@ export function TasksView({ initialTaskId, projectId }) {
                           onClick={() => setActiveTaskId(t.id)}
                         >
                           <TableCell>
-                            <span className="text-xs font-bold">{t.ref}</span>
-                          </TableCell>
-                          <TableCell>
                             <span className="text-sm font-semibold">{t.title}</span>
                           </TableCell>
                           <TableCell>{assignee ? assignee.name : 'Unassigned'}</TableCell>
-                          <TableCell>
-                            <Badge
-                              className={cn(
-                                'border-transparent text-white',
-                                getColorClasses(statusCol?.color || 'gray', 'badge')
-                              )}
-                            >
-                              {t.status.replace('_', ' ')}
-                            </Badge>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            {canEditStatus ? (
+                              <Combobox
+                                items={allowedStatusItems}
+                                value={statusCol?.title}
+                                disabled={updatingStatusTaskId === t.id}
+                                onValueChange={(title) => {
+                                  const nextStatus = COLUMNS.find((col) => col.title === title);
+                                  if (nextStatus) handleStatusChange(t, nextStatus.id);
+                                }}
+                              >
+                                <ComboboxInput
+                                  placeholder="Select status"
+                                  loading={updatingStatusTaskId === t.id}
+                                  className={cn(
+                                    'h-8 w-[160px] border-transparent text-white hover:opacity-90',
+                                    getColorClasses(statusCol?.color || 'gray', 'badge')
+                                  )}
+                                />
+                                <ComboboxContent>
+                                  <ComboboxEmpty>No status found.</ComboboxEmpty>
+                                  <ComboboxList>
+                                    {(item) => {
+                                      const col = COLUMNS.find((c) => c.title === item);
+                                      return (
+                                        <ComboboxItem key={item} value={item}>
+                                          <span className="flex items-center gap-2">
+                                            <span
+                                              className={cn(
+                                                'h-2 w-2 rounded-full',
+                                                getColorClasses(col?.color || 'gray', 'progress')
+                                              )}
+                                            />
+                                            {item}
+                                          </span>
+                                        </ComboboxItem>
+                                      );
+                                    }}
+                                  </ComboboxList>
+                                </ComboboxContent>
+                              </Combobox>
+                            ) : (
+                              <Badge
+                                className={cn(
+                                  'border-transparent text-white',
+                                  getColorClasses(statusCol?.color || 'gray', 'badge')
+                                )}
+                              >
+                                {statusCol?.title || t.status.replace('_', ' ')}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="w-[120px]">
                             <div className="flex items-center gap-2">
@@ -570,13 +698,30 @@ export function TasksView({ initialTaskId, projectId }) {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <span className="text-xs">{t.dueDate || '-'}</span>
+                            {t.dueDate ? (
+                              <span
+                                className={cn(
+                                  'text-xs',
+                                  t.dueDate < todayStr && t.status !== 'done'
+                                    ? 'text-destructive'
+                                    : 'text-muted-foreground'
+                                )}
+                              >
+                                {t.dueDate}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                {formatEstimateHours(t.estimateHours)}
+                              </span>
+                            )}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleOpenEdit(e, t.id)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+                              {canEditTaskDetails(user, t) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleOpenEdit(e, t.id)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                               {(user?.role === 'admin' || t.createdBy === user?.id) && (
                                 <Button
                                   variant="ghost"

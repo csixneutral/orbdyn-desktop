@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
@@ -193,21 +194,20 @@ export function EventModal({ eventItem, opened, onClose, defaultProjectId }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Start Date</Label>
-              <Input
-                type="date"
-                min={eventItem?.id ? undefined : todayStr}
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
+                onChange={setDate}
+                minDate={eventItem?.id ? undefined : todayStr}
+                placeholder="Pick start date"
               />
             </div>
             <div className="space-y-2">
               <Label>End Date</Label>
-              <Input
-                type="date"
-                min={date || todayStr}
+              <DatePicker
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={setEndDate}
+                minDate={date || todayStr}
+                placeholder="Pick end date"
               />
             </div>
           </div>

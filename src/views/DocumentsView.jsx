@@ -44,6 +44,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { PageHeader } from '@/components/ui/typography';
+import { canCreateContent } from '@/lib/roles';
 import { showNotification } from '@/lib/notify';
 import { downloadFile, loadFilePreviewUrl } from '@/lib/files';
 import { useData } from '../context/DataContext';
@@ -169,7 +170,7 @@ export function DocumentsView({ projectId }) {
         title="Documents"
         description={projectId ? 'Files shared in this project' : 'Shared files across your projects'}
       >
-        {user?.role !== 'viewer' && (
+        {canCreateContent(user) && (
           <Button onClick={() => setUploadModalOpened(true)}>
             <Upload className="h-4 w-4" />
             Upload Document

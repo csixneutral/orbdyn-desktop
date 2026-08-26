@@ -23,6 +23,7 @@ import {
 import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
+import { ROLE_OPTIONS } from '@/lib/roles';
 
 export function UserModal({ editUser, opened, onClose }) {
   const { refresh } = useData();
@@ -31,7 +32,7 @@ export function UserModal({ editUser, opened, onClose }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('member');
+  const [role, setRole] = useState('manager');
   const [active, setActive] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,14 +42,14 @@ export function UserModal({ editUser, opened, onClose }) {
       setUsername(editUser.username || '');
       setEmail(editUser.email || '');
       setPassword('');
-      setRole(editUser.role || 'member');
+      setRole(editUser.role || 'manager');
       setActive(editUser.active !== false);
     } else {
       setName('');
       setUsername('');
       setEmail('');
       setPassword('');
-      setRole('member');
+      setRole('manager');
       setActive(true);
     }
   }, [editUser, opened]);
@@ -152,9 +153,11 @@ export function UserModal({ editUser, opened, onClose }) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Administrator (Full Access)</SelectItem>
-                <SelectItem value="member">Member (Create & Edit Work)</SelectItem>
-                <SelectItem value="viewer">Viewer (Read-only)</SelectItem>
+                {ROLE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { EventModal } from '../components/EventModal';
+import { canCreateContent } from '@/lib/roles';
 
 const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
@@ -152,7 +153,7 @@ export function CalendarView({ projectId }) {
             </Button>
           </div>
 
-          {user?.role !== 'viewer' && (
+          {canCreateContent(user) && (
             <Button onClick={() => handleOpenCreate()}>
               <Plus className="h-4 w-4" />
               New Event
@@ -184,7 +185,7 @@ export function CalendarView({ projectId }) {
                     idx < calendarDays.length - 7 && 'border-b border-[#2C2E33]',
                     !dayItem.isCurrentMonth && 'bg-[#0d0e10] opacity-35',
                     dayItem.isCurrentMonth && isPast && 'bg-black/25 opacity-60',
-                    isPast ? 'cursor-not-allowed' : user?.role !== 'viewer' ? 'cursor-pointer hover:bg-muted/20' : 'cursor-default'
+                    isPast ? 'cursor-not-allowed' : canCreateContent(user) ? 'cursor-pointer hover:bg-muted/20' : 'cursor-default'
                   )}
                   onClick={() => {
                     if (isPast) {
@@ -193,7 +194,7 @@ export function CalendarView({ projectId }) {
                         message: 'New events cannot be scheduled on past dates.',
                         color: 'blue',
                       });
-                    } else if (user?.role !== 'viewer') {
+                    } else if (canCreateContent(user)) {
                       handleOpenCreate(dayItem.dateStr);
                     }
                   }}

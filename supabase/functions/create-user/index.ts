@@ -81,7 +81,16 @@ Deno.serve(async (req) => {
 
     const colors = ['#3d7fe0', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
     const color = colors[Math.floor(Math.random() * colors.length)];
-    const resolvedRole = role === 'admin' ? 'admin' : role === 'viewer' ? 'viewer' : 'member';
+    const resolvedRole =
+      role === 'admin'
+        ? 'admin'
+        : role === 'viewer'
+          ? 'viewer'
+          : role === 'manager'
+            ? 'manager'
+            : role === 'member' || role === 'processor'
+              ? 'member'
+              : 'manager';
 
     const { data: profile, error: insertError } = await adminClient
       .from('profiles')

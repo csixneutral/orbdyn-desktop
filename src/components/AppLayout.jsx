@@ -100,24 +100,17 @@ export function AppLayout({ currentView, onNavigate, children }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  >
-                    {theme === 'dark' ? (
-                      <Sun className="h-[18px] w-[18px] text-amber-500" />
-                    ) : (
-                      <Moon className="h-[18px] w-[18px] text-blue-500" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                </TooltipContent>
-              </Tooltip>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-[18px] w-[18px] text-amber-500" />
+                ) : (
+                  <Moon className="h-[18px] w-[18px] text-blue-500" />
+                )}
+              </Button>
 
               <Popover open={popoverOpened} onOpenChange={setPopoverOpened}>
                 <Tooltip>

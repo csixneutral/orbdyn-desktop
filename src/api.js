@@ -22,6 +22,7 @@ import {
   mapActivity,
   mapTrash,
 } from '@/lib/mappers.js';
+import { normalizeRole } from '@/lib/roles';
 
 const TASK_STATUSES = ['todo', 'in_progress', 'review', 'done', 'blocked'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
@@ -54,10 +55,32 @@ function pickColor() {
   return PROFILE_COLORS[Math.floor(Math.random() * PROFILE_COLORS.length)];
 }
 
-function normalizeRole(role) {
-  if (role === 'admin') return 'admin';
-  if (role === 'viewer') return 'viewer';
-  return 'member';
+function normalizeRoleValue(role) {
+  return normalizeRole(role);
+}
+
+function assertCanCreate(profile, message = 'You do not have permission to create this.') {
+  if (profile.role !== 'admin' && profile.role !== 'manager') {
+    throw new Error(message);
+  }
+}
+
+function assertCanUpdateTask(profile, task, payload = {}) {
+  if (profile.role === 'viewer') {
+    throw new Error('Viewers cannot change tasks.');
+  }
+
+  if (profile.role !== 'member') return;
+
+  if (!isTaskAssignee(task, profile.id)) {
+    throw new Error('You can only update tasks assigned to you.');
+  }
+
+  const allowed = new Set(['status', 'progress', 'order']);
+  const keys = Object.keys(payload).filter((key) => payload[key] !== undefined);
+  if (keys.some((key) => !allowed.has(key))) {
+    throw new Error('Members can only update task status and progress.');
+  }
 }
 
 function applyTaskStatusSideEffects(task, beforeStatus) {
@@ -331,7 +354,7 @@ function profileToDb(snapshot, workspaceId) {
     name: snapshot.name,
     username: snapshot.username,
     email: snapshot.email || '',
-    role: snapshot.role || 'member',
+    role: snapshot.role || 'manager',
     color: snapshot.color || pickColor(),
     active: snapshot.active !== false,
     last_seen: snapshot.lastSeen || null,
@@ -388,6 +411,9 @@ function formatAuthError(error, fallback = 'Request failed') {
   }
   if (/already (registered|exists)|user already/i.test(message)) {
     return new Error('An account with this email already exists. Try Sign in instead.');
+  }
+  if (/email not confirmed|confirm your email/i.test(message)) {
+    return new Error('This account is not activated yet. Ask your administrator to re-save the person or contact support.');
   }
   return new Error(message || fallback);
 }
@@ -541,12 +567,19 @@ async function legacyCreateUser({ name, username, password, role, email }) {
   const newUserId = signUpData?.user?.id;
   if (!newUserId) throw new Error('Account was created but user id was missing.');
 
+  const { error: confirmError } = await supabase.rpc('admin_confirm_auth_user', {
+    p_user_id: newUserId,
+  });
+  if (confirmError) {
+    throw formatAuthError(confirmError, 'Account was created but could not be activated for sign-in.');
+  }
+
   const { data, error } = await supabase.rpc('admin_attach_workspace_user', {
     p_user_id: newUserId,
     p_name: String(name).trim(),
     p_username: uname,
     p_email: email ? String(email).trim() : '',
-    p_role: role || 'member',
+    p_role: role || 'manager',
   });
 
   if (error) {
@@ -767,7 +800,7 @@ export const api = {
       p_user_id: id,
       p_name: name !== undefined ? String(name).trim() : null,
       p_email: email !== undefined ? String(email).trim() : null,
-      p_role: role !== undefined ? normalizeRole(role) : null,
+      p_role: role !== undefined ? normalizeRoleValue(role) : null,
       p_active: active !== undefined ? !!active : null,
     });
     throwOnError(error, 'Could not update person.');
@@ -822,7 +855,7 @@ export const api = {
 
   createProject: async (payload) => {
     const { profile, row } = await getSessionProfile();
-    assertNotViewer(profile, 'Viewers cannot create projects.');
+    assertCanCreate(profile, 'You do not have permission to create projects.');
 
     const { name, description, client, colour, memberIds, visibility, dueDate } = payload || {};
     if (!name) throw new Error('A project needs a name.');
@@ -962,7 +995,7 @@ export const api = {
 
   createTask: async (payload) => {
     const { profile, row } = await getSessionProfile();
-    assertNotViewer(profile, 'Viewers cannot create tasks.');
+    assertCanCreate(profile, 'You do not have permission to create tasks.');
 
     const {
       title,
@@ -1071,6 +1104,7 @@ export const api = {
     if (fetchError || !existing) throw new Error('No such task.');
 
     const before = mapTask(existing);
+    assertCanUpdateTask(profile, before, payload);
     const updates = {};
     const now = new Date().toISOString();
 
@@ -1182,6 +1216,16 @@ export const api = {
         .maybeSingle();
       if (error || !existing) continue;
 
+      const beforeTask = mapTask(existing);
+      if (
+        profile.role === 'member' &&
+        item.status &&
+        item.status !== beforeTask.status &&
+        !isTaskAssignee(beforeTask, profile.id)
+      ) {
+        throw new Error('You can only move tasks assigned to you.');
+      }
+
       const beforeStatus = existing.status;
       const updates = { updated_at: now };
       if (item.status && TASK_STATUSES.includes(item.status)) updates.status = item.status;
@@ -1276,6 +1320,9 @@ export const api = {
 
   createComment: async (payload) => {
     const { profile, row } = await getSessionProfile();
+    if (profile.role === 'viewer') {
+      throw new Error('Viewers cannot post messages.');
+    }
     const { taskId, projectId, fileId, body } = payload || {};
     if (!body || !String(body).trim()) throw new Error('Write something first.');
 
@@ -1366,7 +1413,7 @@ export const api = {
 
   uploadFiles: async (formData) => {
     const { profile, row } = await getSessionProfile();
-    assertNotViewer(profile, 'Viewers cannot upload documents.');
+    assertCanCreate(profile, 'You do not have permission to upload documents.');
 
     const workspaceId = row.workspace_id;
     const projectId = formData.get('projectId') || null;
@@ -1523,6 +1570,7 @@ export const api = {
 
   createEvent: async (payload) => {
     const { profile, row } = await getSessionProfile();
+    assertCanCreate(profile, 'You do not have permission to create events.');
     const { title, date, endDate, startTime, endTime, allDay, location, notes, projectId, attendeeIds, kind } =
       payload || {};
     if (!title || !date) throw new Error('An event needs a title and a date.');
@@ -1631,7 +1679,7 @@ export const api = {
 
   restoreTrash: async (id) => {
     const { profile, row } = await getSessionProfile();
-    assertNotViewer(profile, 'Viewers cannot restore items from the Recycle Bin.');
+    assertCanCreate(profile, 'You do not have permission to restore items from the Recycle Bin.');
 
     const { data: trashed, error: fetchError } = await supabase
       .from('trash_items')
@@ -1691,7 +1739,7 @@ export const api = {
 
   deleteTrashPermanent: async (id) => {
     const { profile, row } = await getSessionProfile();
-    assertNotViewer(profile, 'Viewers cannot permanently delete items.');
+    assertCanCreate(profile, 'You do not have permission to permanently delete items.');
 
     const { data: trashed, error: fetchError } = await supabase
       .from('trash_items')
@@ -1723,7 +1771,7 @@ export const api = {
 
   emptyTrash: async () => {
     const { profile, row } = await getSessionProfile();
-    assertNotViewer(profile, 'Viewers cannot empty the Recycle Bin.');
+    assertCanCreate(profile, 'You do not have permission to empty the Recycle Bin.');
 
     const { data: items, error: fetchError } = await supabase
       .from('trash_items')

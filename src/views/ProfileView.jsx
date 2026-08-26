@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { showNotification } from '@/lib/notify.js';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
+import { getRoleShortLabel } from '@/lib/roles';
 
 const AVATAR_COLORS = {
   blue: 'bg-blue-600 text-white',
@@ -65,7 +66,7 @@ export function ProfileView() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="secondary" className="capitalize">
-                {user?.role || 'member'}
+                {getRoleShortLabel(user?.role || 'manager')}
               </Badge>
               {orgName ? <Badge variant="outline">{orgName}</Badge> : null}
             </div>

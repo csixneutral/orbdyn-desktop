@@ -32,14 +32,16 @@ import {
 import { showNotification } from '@/lib/notify.js';
 import { getColorClasses } from '@/lib/colors';
 import { cn } from '@/lib/utils';
-import { PageHeader } from '@/components/ui/typography';
+import { canCreateContent } from '@/lib/roles';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { PageHeader } from '@/components/ui/typography';
 
 export function RecycleBinView() {
   const { user } = useAuth();
   const { trash, refresh } = useData();
+  const trashItems = trash || [];
 
   const [activeTab, setActiveTab] = useState('all');
   const [confirmModalOpened, setConfirmModalOpened] = useState(false);
@@ -47,7 +49,7 @@ export function RecycleBinView() {
   const [actionType, setActionType] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const filteredTrash = (trash || []).filter((item) => {
+  const filteredTrash = trashItems.filter((item) => {
     if (activeTab === 'all') return true;
     if (activeTab === 'project') return item.type === 'project';
     if (activeTab === 'task') return item.type === 'task';
@@ -151,7 +153,7 @@ export function RecycleBinView() {
         title="Recycle Bin"
         description="Deleted items are held here safely. Restore them or delete permanently."
       >
-        {trash.length > 0 && user?.role !== 'viewer' && (
+        {trashItems.length > 0 && canCreateContent(user) && (
           <Button
             variant="destructive"
             className="bg-destructive/15 text-destructive hover:bg-destructive/25"
@@ -165,22 +167,22 @@ export function RecycleBinView() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="all">All ({trash.length})</TabsTrigger>
+          <TabsTrigger value="all">All ({trashItems.length})</TabsTrigger>
           <TabsTrigger value="project">
             <Folder className="h-3.5 w-3.5" />
-            Projects ({trash.filter((i) => i.type === 'project').length})
+            Projects ({trashItems.filter((i) => i.type === 'project').length})
           </TabsTrigger>
           <TabsTrigger value="task">
             <ListChecks className="h-3.5 w-3.5" />
-            Tasks ({trash.filter((i) => i.type === 'task').length})
+            Tasks ({trashItems.filter((i) => i.type === 'task').length})
           </TabsTrigger>
           <TabsTrigger value="file">
             <FileText className="h-3.5 w-3.5" />
-            Documents ({trash.filter((i) => i.type === 'file').length})
+            Documents ({trashItems.filter((i) => i.type === 'file').length})
           </TabsTrigger>
           <TabsTrigger value="user">
             <User className="h-3.5 w-3.5" />
-            People ({trash.filter((i) => i.type === 'user').length})
+            People ({trashItems.filter((i) => i.type === 'user').length})
           </TabsTrigger>
         </TabsList>
 
@@ -223,7 +225,7 @@ export function RecycleBinView() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-2">
-                          {user?.role !== 'viewer' && (
+                          {canCreateContent(user) && (
                             <Button
                               size="sm"
                               variant="secondary"
@@ -234,7 +236,7 @@ export function RecycleBinView() {
                               Restore
                             </Button>
                           )}
-                          {user?.role !== 'viewer' && (
+                          {canCreateContent(user) && (
                             <Button
                               size="sm"
                               variant="ghost"

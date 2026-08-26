@@ -5,13 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { getBadgeStyle, getColorClasses, getProgressStyle } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 import { PageHeader, TypographyMuted } from '@/components/ui/typography';
 import { TaskModal } from '../components/TaskModal';
+import { ProjectTeamStack } from '../components/ProjectTeamStack';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { canCreateContent } from '@/lib/roles';
 
 export function ProjectOverviewView({ projectId, onNavigate }) {
   const { user } = useAuth();
@@ -30,6 +32,7 @@ export function ProjectOverviewView({ projectId, onNavigate }) {
   const owner = users.find((u) => u.id === project.ownerId);
   const memberIds = [...new Set([project.ownerId, ...(project.memberIds || [])].filter(Boolean))];
   const teamMembers = users.filter((u) => memberIds.includes(u.id));
+  const canEditTeam = canCreateContent(user) && (user?.role === 'admin' || project.ownerId === user?.id);
   const recentTasks = [...projectTasks]
     .sort((a, b) => (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || ''))
     .slice(0, 5);
@@ -41,7 +44,7 @@ export function ProjectOverviewView({ projectId, onNavigate }) {
           title={project.name}
           description={project.description || 'Project overview and quick actions'}
         >
-          {user?.role !== 'viewer' && (
+          {canCreateContent(user) && (
             <Button size="sm" className="gap-1" onClick={() => setCreateModalOpened(true)}>
               <Plus className="h-4 w-4" />
               New task
@@ -128,20 +131,7 @@ export function ProjectOverviewView({ projectId, onNavigate }) {
 
             <div>
               <p className="mb-2 text-xs font-semibold text-muted-foreground">Team</p>
-              <div className="flex -space-x-1">
-                {teamMembers.map((m) => (
-                  <Tooltip key={m.id}>
-                    <TooltipTrigger asChild>
-                      <Avatar className="h-7 w-7 border-2 border-background">
-                        <AvatarFallback className={cn('text-xs', getColorClasses(m.color || 'blue', 'avatar'))}>
-                          {m.name ? m.name[0].toUpperCase() : '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent>{m.name}</TooltipContent>
-                  </Tooltip>
-                ))}
-              </div>
+              <ProjectTeamStack project={project} users={users} canEdit={canEditTeam} />
             </div>
           </CardContent>
         </Card>

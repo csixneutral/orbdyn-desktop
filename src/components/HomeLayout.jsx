@@ -4,14 +4,12 @@ import { Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { AppSidebar } from './AppSidebar';
 import { NotificationsPopover } from './NotificationsPopover';
-import { ApiLoadingOverlay } from '@/components/ui/loading-overlay';
 import { useData } from '../context/DataContext';
 import { api } from '../api';
 
-export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, dataLoading, children }) {
+export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, children }) {
   const { notificationList, unreadNotifications, refresh } = useData();
   const { theme, setTheme } = useTheme();
 
@@ -47,23 +45,18 @@ export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, dataLo
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex-1" />
           <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                >
-                  {theme === 'dark' ? (
-                    <Sun className="h-[18px] w-[18px] text-amber-500" />
-                  ) : (
-                    <Moon className="h-[18px] w-[18px] text-blue-500" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</TooltipContent>
-            </Tooltip>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-[18px] w-[18px] text-amber-500" />
+              ) : (
+                <Moon className="h-[18px] w-[18px] text-blue-500" />
+              )}
+            </Button>
             <NotificationsPopover
               notificationList={notificationList}
               unreadNotifications={unreadNotifications}
@@ -73,10 +66,6 @@ export function HomeLayout({ currentView, onNavigate, onWorkspaceChanged, dataLo
           </div>
         </header>
         <div className="relative flex flex-1 flex-col p-4">
-          <ApiLoadingOverlay
-            loading={dataLoading && currentView !== 'projects'}
-            label="Loading workspace..."
-          />
           <div className="mx-auto w-full max-w-[1400px]">{children}</div>
         </div>
       </SidebarInset>

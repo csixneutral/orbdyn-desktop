@@ -55,7 +55,7 @@ function mapNotificationLink(link, tasks) {
 
 export function App() {
   const { loading, user, connectionError, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
-  const { tasks, projects, loading: dataLoading } = useData();
+  const { tasks, projects } = useData();
 
   const [authScreen, setAuthScreen] = useState('welcome');
   const [homeView, setHomeView] = useState('projects');
@@ -211,7 +211,6 @@ export function App() {
       <ProjectWorkspaceLayout
         project={activeProject}
         projects={projects}
-        dataLoading={dataLoading}
         currentView={projectView}
         onNavigate={handleProjectNavigate}
         onSelectProject={(projectId) => {
@@ -271,7 +270,7 @@ export function App() {
   };
 
   return (
-    <HomeLayout currentView={homeView} onNavigate={handleHomeNavigate} onWorkspaceChanged={handleWorkspaceChanged} dataLoading={dataLoading}>
+    <HomeLayout currentView={homeView} onNavigate={handleHomeNavigate} onWorkspaceChanged={handleWorkspaceChanged}>
       {renderHomeView()}
     </HomeLayout>
   );

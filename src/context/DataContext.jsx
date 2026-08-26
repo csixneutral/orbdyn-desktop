@@ -81,6 +81,7 @@ export function DataProvider({ children }) {
 
     const tables = [
       'profiles',
+      'workspace_members',
       'projects',
       'tasks',
       'comments',
@@ -137,7 +138,7 @@ export function DataProvider({ children }) {
         dashboardData,
         shareStatus,
         loading,
-        refresh: fetchAll,
+        refresh: () => fetchAll({ silent: true }),
         setShareStatus,
       }}
     >

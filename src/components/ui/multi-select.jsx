@@ -22,6 +22,10 @@ export function MultiSelect({
   const filtered = options.filter((opt) =>
     opt.label.toLowerCase().includes(search.toLowerCase())
   );
+  const filteredValues = filtered.map((opt) => opt.value);
+  const allFilteredSelected =
+    filteredValues.length > 0 && filteredValues.every((v) => value.includes(v));
+  const someFilteredSelected = filteredValues.some((v) => value.includes(v));
 
   const toggle = (optValue) => {
     if (value.includes(optValue)) {
@@ -34,6 +38,14 @@ export function MultiSelect({
   const remove = (e, optValue) => {
     e.stopPropagation();
     onChange(value.filter((v) => v !== optValue));
+  };
+
+  const toggleAllFiltered = () => {
+    if (allFilteredSelected) {
+      onChange(value.filter((v) => !filteredValues.includes(v)));
+      return;
+    }
+    onChange([...new Set([...value, ...filteredValues])]);
   };
 
   return (
@@ -89,17 +101,29 @@ export function MultiSelect({
             {filtered.length === 0 ? (
               <p className="py-4 text-center text-sm text-muted-foreground">No options found.</p>
             ) : (
-              filtered.map((opt) => (
+              <>
                 <button
-                  key={opt.value}
                   type="button"
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                  onClick={() => toggle(opt.value)}
+                  className="mb-1 flex w-full items-center gap-2 rounded-sm border-b px-2 py-1.5 text-sm font-medium hover:bg-accent"
+                  onClick={toggleAllFiltered}
                 >
-                  <Checkbox checked={value.includes(opt.value)} />
-                  <span>{opt.label}</span>
+                  <Checkbox
+                    checked={allFilteredSelected ? true : someFilteredSelected ? 'indeterminate' : false}
+                  />
+                  <span>{allFilteredSelected ? 'Deselect all' : 'Select all'}</span>
                 </button>
-              ))
+                {filtered.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                    onClick={() => toggle(opt.value)}
+                  >
+                    <Checkbox checked={value.includes(opt.value)} />
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
+              </>
             )}
           </div>
         </ScrollArea>

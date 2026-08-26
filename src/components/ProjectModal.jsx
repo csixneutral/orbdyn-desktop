@@ -33,10 +33,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { cn } from '@/lib/utils';
 import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 
 const PRESET_COLORS = ['#3d7fe0', '#5b8def', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -63,6 +65,7 @@ function SegmentedControl({ value, onChange, options }) {
 }
 
 export function ProjectModal({ project, opened, onClose }) {
+  const { user } = useAuth();
   const { users, refresh } = useData();
 
   const [name, setName] = useState('');
@@ -76,6 +79,11 @@ export function ProjectModal({ project, opened, onClose }) {
   const [deleteConfirmOpened, setDeleteConfirmOpened] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const projectOwnerId = project?.ownerId || user?.id;
+  const memberOptions = users
+    .filter((u) => u.id !== projectOwnerId)
+    .map((u) => ({ value: u.id, label: u.name }));
+
   useEffect(() => {
     if (project) {
       setName(project.name || '');
@@ -83,7 +91,7 @@ export function ProjectModal({ project, opened, onClose }) {
       setClient(project.client || '');
       setColour(project.colour || '#3d7fe0');
       setVisibility(project.visibility || 'everyone');
-      setMemberIds(project.memberIds || []);
+      setMemberIds((project.memberIds || []).filter((id) => id !== project.ownerId));
       setDueDate(project.dueDate || '');
     } else {
       setName('');
@@ -103,7 +111,15 @@ export function ProjectModal({ project, opened, onClose }) {
     }
     try {
       setSubmitting(true);
-      const payload = { name, description, client, colour, visibility, memberIds, dueDate };
+      const payload = {
+        name,
+        description,
+        client,
+        colour,
+        visibility,
+        memberIds: memberIds.filter((id) => id && id !== projectOwnerId),
+        dueDate,
+      };
 
       if (project?.id) {
         await api.updateProject(project.id, payload);
@@ -251,7 +267,7 @@ export function ProjectModal({ project, opened, onClose }) {
                     <Calendar className="h-4 w-4 text-violet-500" />
                     Target Due Date
                   </Label>
-                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  <DatePicker value={dueDate} onChange={setDueDate} placeholder="Pick target due date" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -264,8 +280,8 @@ export function ProjectModal({ project, opened, onClose }) {
                     </span>
                   </div>
                   <MultiSelect
-                    options={users.map((u) => ({ value: u.id, label: u.name }))}
-                    value={memberIds}
+                    options={memberOptions}
+                    value={memberIds.filter((id) => id !== projectOwnerId)}
                     onChange={setMemberIds}
                     placeholder="Select additional team members"
                   />

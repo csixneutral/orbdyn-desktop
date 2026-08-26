@@ -6,6 +6,7 @@ import {
   Trash2,
   Folder,
   User,
+  UserPlus,
   Calendar,
   Clock,
   ListChecks,
@@ -35,12 +36,25 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { DatePicker } from '@/components/ui/date-picker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { UserModal } from './UserModal';
+import {
+  TASK_STATUS_COLUMNS,
+  canChangeTaskStatus,
+  getAllowedTaskStatuses,
+  getStatusChangeBlockedMessage,
+} from '@/lib/task-status';
+
+const STATUS_OPTIONS = TASK_STATUS_COLUMNS.map((col) => ({
+  label: col.title,
+  value: col.id,
+}));
 
 const AVATAR_COLORS = {
   blue: '#3b82f6',
@@ -90,14 +104,17 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
   const [projectId, setProjectId] = useState(null);
   const [assigneeIds, setAssigneeIds] = useState([]);
   const [status, setStatus] = useState('todo');
+  const [originalStatus, setOriginalStatus] = useState('todo');
   const [priority, setPriority] = useState('normal');
   const [progress, setProgress] = useState(0);
   const [dueDate, setDueDate] = useState('');
   const [estimateHours, setEstimateHours] = useState(0);
+  const [scheduleBy, setScheduleBy] = useState('due_date');
 
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [addPersonOpen, setAddPersonOpen] = useState(false);
 
   useEffect(() => {
     if (taskId) {
@@ -111,13 +128,28 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
     setTitle('');
     setDescription('');
     setProjectId(defaultProjectId || projects[0]?.id || null);
-    setAssigneeIds(user?.id ? [user.id] : []);
+    setAssigneeIds([]);
     setStatus('todo');
+    setOriginalStatus('todo');
     setPriority('normal');
     setProgress(0);
     setDueDate('');
     setEstimateHours(0);
+    setScheduleBy('due_date');
     setComments([]);
+  };
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  const handleScheduleByChange = (mode) => {
+    setScheduleBy(mode);
+    if (mode === 'due_date') {
+      setEstimateHours(0);
+      if (!dueDate) setDueDate(todayIso);
+    } else {
+      setDueDate('');
+      if (!estimateHours) setEstimateHours(1);
+    }
   };
 
   const loadTaskDetails = async () => {
@@ -132,10 +164,12 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
           task.assigneeIds?.length ? task.assigneeIds : task.assigneeId ? [task.assigneeId] : []
         );
         setStatus(task.status || 'todo');
+        setOriginalStatus(task.status || 'todo');
         setPriority(task.priority || 'normal');
         setProgress(task.progress || 0);
         setDueDate(task.dueDate || '');
         setEstimateHours(task.estimateHours || 0);
+        setScheduleBy(task.estimateHours > 0 && !task.dueDate ? 'estimate_hours' : 'due_date');
 
         const { comments: cList } = await api.getComments({ taskId });
         setComments(cList || []);
@@ -150,6 +184,26 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
       showNotification({ title: 'Error', message: 'Task title is required', color: 'red' });
       return;
     }
+
+    const selectedProject = projects.find((p) => p.id === projectId);
+    if (
+      taskId &&
+      !canChangeTaskStatus({
+        user,
+        task: { assigneeIds, assigneeId: assigneeIds[0] || null },
+        project: selectedProject,
+        fromStatus: originalStatus,
+        toStatus: status,
+      })
+    ) {
+      showNotification({
+        title: 'Not allowed',
+        message: getStatusChangeBlockedMessage(),
+        color: 'red',
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
       const payload = {
@@ -161,8 +215,8 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
         status,
         priority,
         progress,
-        dueDate,
-        estimateHours,
+        dueDate: scheduleBy === 'due_date' ? dueDate || null : null,
+        estimateHours: scheduleBy === 'estimate_hours' ? Number(estimateHours) || 0 : 0,
       };
 
       if (taskId) {
@@ -207,14 +261,25 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
 
   const assigneeOptions = (() => {
     const selProj = projects.find((p) => p.id === projectId);
+    let pool = users.filter((u) => u.active !== false && u.id !== user?.id);
+
     if (selProj && selProj.visibility === 'members') {
       const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
-      return users
-        .filter((u) => u.active !== false && allowedIds.has(u.id))
-        .map((u) => ({ value: u.id, label: u.name }));
+      pool = pool.filter((u) => allowedIds.has(u.id));
     }
-    return users.filter((u) => u.active !== false).map((u) => ({ value: u.id, label: u.name }));
+
+    return pool.map((u) => ({ value: u.id, label: u.name }));
   })();
+
+  const selectedProject = projects.find((p) => p.id === projectId);
+  const statusOptions = taskId
+    ? getAllowedTaskStatuses({
+        user,
+        task: { assigneeIds, assigneeId: assigneeIds[0] || null },
+        project: selectedProject,
+        currentStatus: originalStatus,
+      }).map((col) => ({ label: col.title, value: col.id }))
+    : STATUS_OPTIONS;
 
   return (
     <Dialog open={opened} onOpenChange={(v) => !v && onClose()}>
@@ -299,12 +364,36 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
                   <User className="h-3.5 w-3.5 text-emerald-500" />
                   Awarded To / Assignees
                 </Label>
-                <MultiSelect
-                  options={assigneeOptions}
-                  value={assigneeIds}
-                  onChange={setAssigneeIds}
-                  placeholder="Select assignees"
-                />
+                {assigneeOptions.length === 0 ? (
+                  <div className="rounded-md border border-dashed bg-muted/20 px-3 py-4 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      No other people in this workspace yet.
+                    </p>
+                    {user?.role === 'admin' ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => setAddPersonOpen(true)}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Add Person
+                      </Button>
+                    ) : (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Ask an administrator to add team members.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <MultiSelect
+                    options={assigneeOptions}
+                    value={assigneeIds.filter((id) => assigneeOptions.some((opt) => opt.value === id))}
+                    onChange={setAssigneeIds}
+                    placeholder="Select assignees"
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -319,13 +408,7 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
                     setStatus(val);
                     if (val === 'done') setProgress(100);
                   }}
-                  options={[
-                    { label: 'To Do', value: 'todo' },
-                    { label: 'In Progress', value: 'in_progress' },
-                    { label: 'In Review', value: 'review' },
-                    { label: 'Done', value: 'done' },
-                    { label: 'Blocked', value: 'blocked' },
-                  ]}
+                  options={statusOptions}
                 />
               </div>
               <div className="space-y-2">
@@ -374,26 +457,72 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
                 <span>50%</span>
                 <span>100%</span>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5 text-xs font-semibold">
-                    <Calendar className="h-3.5 w-3.5 text-violet-500" />
-                    Due Date
-                  </Label>
-                  <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              <Separator />
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold text-muted-foreground">Schedule by</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={scheduleBy === 'due_date' ? 'default' : 'outline'}
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => handleScheduleByChange('due_date')}
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    Due date
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={scheduleBy === 'estimate_hours' ? 'default' : 'outline'}
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => handleScheduleByChange('estimate_hours')}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    Est. hours
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5 text-xs font-semibold">
-                    <Clock className="h-3.5 w-3.5 text-pink-500" />
-                    Estimated Hours
-                  </Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={estimateHours}
-                    onChange={(e) => setEstimateHours(Number(e.target.value) || 0)}
-                  />
-                </div>
+
+                {scheduleBy === 'due_date' ? (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Calendar className="h-3.5 w-3.5 text-violet-500" />
+                      Due Date
+                    </Label>
+                    <div className="flex gap-2">
+                      <DatePicker
+                        value={dueDate}
+                        onChange={setDueDate}
+                        placeholder="Pick due date"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant={dueDate === todayIso ? 'default' : 'outline'}
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => setDueDate(todayIso)}
+                      >
+                        Today
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Clock className="h-3.5 w-3.5 text-pink-500" />
+                      Estimated Hours
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      value={estimateHours}
+                      onChange={(e) => setEstimateHours(Number(e.target.value) || 0)}
+                    />
+                    <p className="text-xs text-muted-foreground">How many hours this task should take</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -480,6 +609,14 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
           </div>
         </div>
       </DialogContent>
+
+      <UserModal
+        opened={addPersonOpen}
+        onClose={() => {
+          setAddPersonOpen(false);
+          refresh();
+        }}
+      />
     </Dialog>
   );
 }

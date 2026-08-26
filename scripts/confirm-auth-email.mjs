@@ -21,18 +21,50 @@ const client = new pg.Client({
   ssl: { rejectUnauthorized: false },
 });
 
-const email = process.argv[2] || 'subham@meensou.com';
+const identifier = process.argv[2];
+if (!identifier) {
+  console.error('Usage: node scripts/confirm-auth-email.mjs <username-or-email>');
+  process.exit(1);
+}
 
 await client.connect();
+
+let email = identifier.includes('@') ? identifier.trim().toLowerCase() : null;
+
+if (!email) {
+  const { rows } = await client.query(
+    `select u.email
+     from public.profiles p
+     join auth.users u on u.id = p.id
+     where p.username = lower(trim($1))
+     limit 1`,
+    [identifier]
+  );
+  email = rows[0]?.email || null;
+
+  if (!email) {
+    const authDomain = new URL(env.VITE_SUPABASE_URL).hostname;
+    email = `${identifier.trim().toLowerCase()}@${authDomain}`;
+  }
+}
+
 await client.query(
   `update auth.users
-   set email_confirmed_at = coalesce(email_confirmed_at, now())
-   where email = $1`,
+   set email_confirmed_at = coalesce(email_confirmed_at, now()),
+       updated_at = now()
+   where lower(email) = lower($1)`,
   [email]
 );
+
 const { rows } = await client.query(
-  'select id, email, email_confirmed_at from auth.users where email = $1',
+  'select id, email, email_confirmed_at from auth.users where lower(email) = lower($1)',
   [email]
 );
+
+if (!rows[0]) {
+  console.error(`No auth user found for: ${email}`);
+  process.exit(1);
+}
+
 console.log(rows[0]);
 await client.end();
