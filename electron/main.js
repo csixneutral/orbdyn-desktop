@@ -175,7 +175,13 @@ if (!app.requestSingleInstanceLock()) {
     setupAutoUpdater(() => win);
   });
 
-  app.on('before-quit', () => { quitting = true; });
+  app.on('before-quit', () => {
+    quitting = true;
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
+  });
   app.on('window-all-closed', () => {});
   app.on('activate', () => {
     if (win) win.show();

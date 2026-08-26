@@ -1,6 +1,6 @@
 {
   "name": "orbdyn",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Orbdyn — team workspace for tasks, documents, calendar and notifications. Powered by Supabase.",
   "main": "electron/main.js",
   "author": "Orbdyn",
@@ -107,7 +107,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Orbdyn"
+      "shortcutName": "Orbdyn",
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [
