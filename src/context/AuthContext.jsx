@@ -13,6 +13,7 @@ export function AuthProvider({ children }) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState(null);
   const [connectionError, setConnectionError] = useState(false);
   const [connectionErrorReason, setConnectionErrorReason] = useState('');
+  const [connectionErrorDetail, setConnectionErrorDetail] = useState('');
   const [migrationNeeded, setMigrationNeeded] = useState(false);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
 
@@ -43,10 +44,15 @@ export function AuthProvider({ children }) {
       setLoading(true);
       setConnectionError(false);
       setConnectionErrorReason('');
+      setConnectionErrorDetail('');
 
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim();
+      const supabaseKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+
+      if (!supabaseUrl || !supabaseKey) {
         setConnectionError(true);
         setConnectionErrorReason('missing_config');
+        setConnectionErrorDetail('');
         setMigrationNeeded(false);
         setSetupNeeded(false);
         setUser(null);
@@ -69,9 +75,11 @@ export function AuthProvider({ children }) {
         setMigrationNeeded(true);
         setConnectionError(false);
         setConnectionErrorReason('');
+        setConnectionErrorDetail('');
       } else {
         setConnectionError(true);
         setConnectionErrorReason('bootstrap_failed');
+        setConnectionErrorDetail(err?.message || 'Could not reach Supabase.');
         setMigrationNeeded(false);
       }
       setSetupNeeded(false);
@@ -159,6 +167,7 @@ export function AuthProvider({ children }) {
         activeWorkspaceId,
         connectionError,
         connectionErrorReason,
+        connectionErrorDetail,
         migrationNeeded,
         isOnline,
         login,

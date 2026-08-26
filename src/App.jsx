@@ -53,7 +53,7 @@ function mapNotificationLink(link, tasks) {
 }
 
 export function App() {
-  const { loading, user, connectionError, connectionErrorReason, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
+  const { loading, user, connectionError, connectionErrorReason, connectionErrorDetail, migrationNeeded, isOnline, refreshBootstrap } = useAuth();
   const { tasks, projects } = useData();
 
   const [authScreen, setAuthScreen] = useState('welcome');
@@ -150,6 +150,9 @@ export function App() {
           <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
             <TypographyH3 className="scroll-m-0">Cannot connect to Orbdyn</TypographyH3>
             <TypographyMuted>{detail}</TypographyMuted>
+            {connectionErrorReason === 'bootstrap_failed' && connectionErrorDetail ? (
+              <TypographyMuted className="text-xs text-destructive/90">{connectionErrorDetail}</TypographyMuted>
+            ) : null}
             <Button onClick={refreshBootstrap}>Try again</Button>
           </CardContent>
         </Card>

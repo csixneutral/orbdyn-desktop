@@ -7,9 +7,10 @@ public/assets/
 
 # Environment and secrets
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
-.env.production
+!.env.production
 *.pem
 *.key
 credentials.json

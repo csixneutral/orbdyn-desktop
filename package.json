@@ -1,6 +1,6 @@
 {
   "name": "orbdyn",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Orbdyn — team workspace for tasks, documents, calendar and notifications. Powered by Supabase.",
   "main": "electron/main.js",
   "author": "Orbdyn",
