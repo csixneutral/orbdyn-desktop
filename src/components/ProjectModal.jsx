@@ -235,59 +235,53 @@ export function ProjectModal({ project, opened, onClose }) {
                       </button>
                     ))}
                   </div>
-                  <div className="space-y-2">
-                    <Label>Custom Color Hex</Label>
-                    <Input
-                      placeholder="Or custom hex code e.g. #3d7fe0"
-                      value={colour}
-                      onChange={(e) => setColour(e.target.value)}
-                    />
-                  </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-muted/20">
-              <CardContent className="space-y-4 pt-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                    Visibility Permissions
-                  </Label>
-                  <SegmentedControl
-                    value={visibility}
-                    onChange={setVisibility}
-                    options={[
-                      { label: 'Everyone in Workspace', value: 'everyone' },
-                      { label: 'Team Members Only', value: 'members' },
-                    ]}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5">
-                    <Calendar className="h-4 w-4 text-violet-500" />
-                    Target Due Date
-                  </Label>
-                  <DatePicker value={dueDate} onChange={setDueDate} placeholder="Pick target due date" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-1.5 text-xs font-semibold">
-                      <User className="h-3.5 w-3.5 text-emerald-500" />
-                      Team Members
+            {project ? (
+              <Card className="bg-muted/20">
+                <CardContent className="space-y-4 pt-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                      Visibility Permissions
                     </Label>
-                    <span className="text-[10px] text-muted-foreground">
-                      Project Owner is automatically included
-                    </span>
+                    <SegmentedControl
+                      value={visibility}
+                      onChange={setVisibility}
+                      options={[
+                        { label: 'Everyone in Workspace', value: 'everyone' },
+                        { label: 'Team Members Only', value: 'members' },
+                      ]}
+                    />
                   </div>
-                  <MultiSelect
-                    options={memberOptions}
-                    value={memberIds.filter((id) => id !== projectOwnerId)}
-                    onChange={setMemberIds}
-                    placeholder="Select additional team members"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5">
+                      <Calendar className="h-4 w-4 text-violet-500" />
+                      Target Due Date
+                    </Label>
+                    <DatePicker value={dueDate} onChange={setDueDate} placeholder="Pick target due date" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="flex items-center gap-1.5 text-xs font-semibold">
+                        <User className="h-3.5 w-3.5 text-emerald-500" />
+                        Team Members
+                      </Label>
+                      <span className="text-[10px] text-muted-foreground">
+                        Project Owner is automatically included
+                      </span>
+                    </div>
+                    <MultiSelect
+                      options={memberOptions}
+                      value={memberIds.filter((id) => id !== projectOwnerId)}
+                      onChange={setMemberIds}
+                      placeholder="Select additional team members"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
 
             <div className="flex items-center justify-between pt-2">
               {project?.id ? (

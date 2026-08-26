@@ -1,11 +1,11 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { TypographyH3, TypographyMuted } from '@/components/ui/typography';
 import { cn } from '@/lib/utils';
+import { MarketingHeader } from '@/components/MarketingHeader';
 
 export function AuthLayout({
-  onBack,
+  onSignIn,
+  onHome,
   title,
   description,
   icon: Icon,
@@ -16,23 +16,16 @@ export function AuthLayout({
   footer,
 }) {
   return (
-    <div className="relative h-screen overflow-hidden bg-background">
+    <div className="relative min-h-screen bg-background">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
         <div className="absolute bottom-0 right-0 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto flex h-full w-full max-w-lg flex-col px-4 py-4 sm:px-6">
-        <header className="shrink-0 pt-1">
-          {onBack ? (
-            <Button variant="ghost" size="sm" className="gap-1.5 px-2" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          ) : null}
-        </header>
+      <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
+        <MarketingHeader onSignIn={onSignIn} onHome={onHome} />
 
-        <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 py-2">
+        <main className="my-8 flex flex-1 flex-col items-center justify-center gap-4 py-2 sm:my-12">
           {totalSteps > 1 && (
             <div className="w-full max-w-[440px] shrink-0">
               <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">

@@ -372,6 +372,13 @@ async function removeStorageFile(path) {
   await supabase.storage.from(FILES_BUCKET).remove([path]);
 }
 
+async function resolveAvatarUrl(storagePath) {
+  if (!storagePath) return null;
+  const { data, error } = await supabase.storage.from(FILES_BUCKET).createSignedUrl(storagePath, 86400);
+  if (error) return null;
+  return data.signedUrl;
+}
+
 async function authEmailFromProfile(row) {
   if (row?.username) {
     const { data, error } = await supabase.rpc('login_email_for_username', {
@@ -413,19 +420,73 @@ function formatAuthError(error, fallback = 'Request failed') {
     return new Error('An account with this email already exists. Try Sign in instead.');
   }
   if (/email not confirmed|confirm your email/i.test(message)) {
-    return new Error('This account is not activated yet. Ask your administrator to re-save the person or contact support.');
+    return new Error('This account is not activated yet. Try Sign in again, or ask your administrator to confirm your email in Supabase Auth.');
   }
   return new Error(message || fallback);
 }
 
-async function finishSetupSession(contactEmail, password, setupData, orgName) {
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+function isEmailNotConfirmedError(error) {
+  return /email not confirmed|confirm your email/i.test(error?.message || '');
+}
+
+function setupConfirmFailureMessage(result, contactEmail) {
+  const rpcMessage = result?.error?.message || '';
+
+  if (/function.*does not exist|could not find the function/i.test(rpcMessage)) {
+    return 'Server setup is incomplete. Run migrations 017–019 in the Supabase SQL Editor, then try again.';
+  }
+  if (/already set up|profile already exists|account already/i.test(rpcMessage)) {
+    return 'This account already exists. Use Sign in instead of registering again.';
+  }
+  if (/auth user not found/i.test(rpcMessage)) {
+    return 'Account could not be found. Try again with a new email address.';
+  }
+
+  return `Could not finish account setup${rpcMessage ? `: ${rpcMessage}` : ''}. In Supabase → Auth → Users, confirm or delete ${contactEmail}, then try again.`;
+}
+
+async function tryConfirmSetupUser({ userId, email }) {
+  let lastError = null;
+
+  if (userId) {
+    const { error } = await supabase.rpc('setup_confirm_auth_user', { p_user_id: userId });
+    if (!error) return { ok: true };
+    lastError = error;
+  }
+
+  if (email) {
+    const { error } = await supabase.rpc('setup_confirm_auth_user_by_email', { p_email: email });
+    if (!error) return { ok: true };
+    lastError = error;
+  }
+
+  return { ok: false, error: lastError };
+}
+
+async function signInForSetup(contactEmail, password, fallback = 'Account was created but sign-in failed. Try Sign in.') {
+  const credentials = {
     email: contactEmail,
     password: String(password),
-  });
-  if (signInError) {
-    throw formatAuthError(signInError, 'Account was created but sign-in failed. Try Sign in.');
+  };
+
+  let { error } = await supabase.auth.signInWithPassword(credentials);
+  if (!error) return;
+
+  if (isEmailNotConfirmedError(error)) {
+    const confirmResult = await tryConfirmSetupUser({ email: contactEmail });
+    if (!confirmResult.ok) {
+      throw new Error(setupConfirmFailureMessage(confirmResult, contactEmail));
+    }
+
+    ({ error } = await supabase.auth.signInWithPassword(credentials));
+    if (!error) return;
   }
+
+  throw formatAuthError(error, fallback);
+}
+
+async function finishSetupSession(contactEmail, password, setupData, orgName) {
+  await signInForSetup(contactEmail, password, 'Account was created but sign-in failed. Try Sign in.');
 
   return {
     user: setupData?.user || null,
@@ -433,62 +494,94 @@ async function finishSetupSession(contactEmail, password, setupData, orgName) {
   };
 }
 
+async function registerSetupUser({ name, username, password, contactEmail }) {
+  const { data: emailExists, error: existsError } = await supabase.rpc('setup_auth_email_exists', {
+    p_email: contactEmail,
+  });
+
+  if (!existsError && emailExists) {
+    await signInForSetup(
+      contactEmail,
+      password,
+      'An account with this email already exists. Sign in with your password.'
+    );
+    return;
+  }
+
+  const { data, error: signUpError } = await supabase.auth.signUp({
+    email: contactEmail,
+    password: String(password),
+    options: {
+      data: { name: String(name).trim(), username },
+    },
+  });
+
+  if (signUpError) {
+    if (/already|registered|exists/i.test(signUpError.message || '')) {
+      await signInForSetup(
+        contactEmail,
+        password,
+        'An account with this email already exists. Use Sign in with your password.'
+      );
+      return;
+    }
+    throw formatAuthError(signUpError, 'Setup failed');
+  }
+
+  if (!data?.session) {
+    const credentials = {
+      email: contactEmail,
+      password: String(password),
+    };
+
+    const { error: immediateSignInError } = await supabase.auth.signInWithPassword(credentials);
+    if (!immediateSignInError) return;
+
+    const newUserId = data?.user?.id;
+    if (!newUserId) {
+      throw new Error('Account was created but sign-in could not start. Try Sign in.');
+    }
+
+    if (isEmailNotConfirmedError(immediateSignInError)) {
+      const confirmResult = await tryConfirmSetupUser({ userId: newUserId, email: contactEmail });
+      if (!confirmResult.ok) {
+        throw new Error(setupConfirmFailureMessage(confirmResult, contactEmail));
+      }
+      await signInForSetup(contactEmail, password, 'Account was created but sign-in failed. Try Sign in.');
+      return;
+    }
+
+    throw formatAuthError(immediateSignInError, 'Account was created but sign-in failed. Try Sign in.');
+  }
+}
+
 async function legacyClientSetup({ name, username, password, orgName, contactEmail }) {
   const uname = String(username).trim().toLowerCase();
   const pwd = String(password);
 
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+  const { error: initialSignInError } = await supabase.auth.signInWithPassword({
     email: contactEmail,
     password: pwd,
   });
 
-  if (signInError) {
-    const signInMessage = signInError.message || '';
+  if (initialSignInError) {
+    const message = initialSignInError.message || '';
 
-    if (/rate limit|after \d+ seconds|too many requests|email rate limit/i.test(signInMessage)) {
-      throw formatAuthError(signInError, 'Setup failed');
+    if (/rate limit|after \d+ seconds|too many requests|email rate limit/i.test(message)) {
+      throw formatAuthError(initialSignInError, 'Setup failed');
     }
 
-    if (/invalid login credentials/i.test(signInMessage)) {
-      const { data: emailExists, error: existsError } = await supabase.rpc('setup_auth_email_exists', {
-        p_email: contactEmail,
-      });
-
-      if (!existsError && emailExists) {
-        throw new Error(
-          'An account with this email already exists. Sign in with your existing password, or wait a minute and try again.'
-        );
-      }
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: contactEmail,
+    if (isEmailNotConfirmedError(initialSignInError)) {
+      await signInForSetup(contactEmail, pwd, 'Setup failed');
+    } else if (/invalid login credentials/i.test(message)) {
+      await registerSetupUser({
+        name,
+        username: uname,
         password: pwd,
-        options: {
-          data: { name: String(name).trim(), username: uname },
-        },
+        contactEmail,
       });
-
-      if (signUpError) {
-        if (/already|registered|exists/i.test(signUpError.message || '')) {
-          const { error: retrySignInError } = await supabase.auth.signInWithPassword({
-            email: contactEmail,
-            password: pwd,
-          });
-          if (retrySignInError) {
-            throw new Error(
-              'An account with this email already exists. Use Sign in with your password instead of creating a new account.'
-            );
-          }
-        } else {
-          throw formatAuthError(signUpError, 'Setup failed');
-        }
-      } else if (!data?.session) {
-        throw new Error(
-          'Account created, but no active session. In Supabase Dashboard → Auth → Providers → Email, turn off "Confirm email", then try Sign in.'
-        );
-      }
     } else {
-      throw formatAuthError(signInError, 'Setup failed');
+      throw formatAuthError(initialSignInError, 'Setup failed');
     }
   }
 
@@ -760,6 +853,57 @@ export const api = {
     const { error } = await supabase.auth.updateUser({ password: String(next) });
     throwOnError(error, 'Could not update password.');
     return { ok: true };
+  },
+
+  getAvatarUrl: async (storagePath) => resolveAvatarUrl(storagePath),
+
+  updateProfile: async (payload = {}) => {
+    const { name, avatarFile, removeAvatar } = payload;
+    const { row } = await getSessionProfile();
+    const updates = {};
+
+    if (name !== undefined) {
+      const trimmed = String(name).trim();
+      if (!trimmed) throw new Error('Name is required.');
+      updates.name = trimmed;
+    }
+
+    if (removeAvatar) {
+      if (row.avatar_url) {
+        try {
+          await removeStorageFile(row.avatar_url);
+        } catch {
+          // Ignore missing storage objects when clearing avatar.
+        }
+      }
+      updates.avatar_url = '';
+    } else if (avatarFile) {
+      if (!avatarFile.type?.startsWith('image/')) {
+        throw new Error('Please choose an image file.');
+      }
+      if (avatarFile.size > 2 * 1024 * 1024) {
+        throw new Error('Image must be 2 MB or smaller.');
+      }
+      const ext = (avatarFile.name.split('.').pop() || 'jpg').toLowerCase().slice(0, 5);
+      const avatarPath = `${row.workspace_id}/avatars/${row.id}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from(FILES_BUCKET).upload(avatarPath, avatarFile, {
+        upsert: true,
+        contentType: avatarFile.type || 'image/jpeg',
+      });
+      throwOnError(uploadError, 'Could not upload profile photo.');
+      updates.avatar_url = avatarPath;
+    }
+
+    if (!Object.keys(updates).length) {
+      const { profile } = await getSessionProfile();
+      return { user: profile };
+    }
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', row.id);
+    throwOnError(error, 'Could not update profile.');
+
+    const { profile } = await getSessionProfile();
+    return { user: profile };
   },
 
   // Users

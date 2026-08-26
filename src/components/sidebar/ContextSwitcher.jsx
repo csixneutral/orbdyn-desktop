@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { AppLogo } from '@/components/AppLogo';
 import { cn } from '@/lib/utils';
 import { getBadgeStyle, getColorClasses } from '@/lib/colors';
 import { showNotification } from '@/lib/notify';
@@ -110,9 +111,7 @@ export function ContextSwitcher({
                 tooltip="Orbdyn"
                 className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                  O
-                </div>
+                <AppLogo size="sm" />
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-semibold">Orbdyn</span>
                   <span className="truncate text-xs text-muted-foreground">{subtitle}</span>

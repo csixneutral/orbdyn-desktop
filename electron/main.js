@@ -22,13 +22,32 @@ function appUrl() {
   return `file://${path.join(__dirname, '..', 'public', 'index.html').replace(/\\/g, '/')}`;
 }
 
-function iconImage() {
-  const file = path.join(__dirname, '..', 'assets', 'icon.png');
+function iconPath() {
+  return path.join(__dirname, '..', 'assets', 'icon.png');
+}
+
+function iconImage({ tray = false } = {}) {
   try {
-    const img = nativeImage.createFromPath(file);
-    if (!img.isEmpty()) return img;
+    let img = nativeImage.createFromPath(iconPath());
+    if (img.isEmpty()) return undefined;
+    if (tray) {
+      const size = process.platform === 'darwin' ? 22 : 16;
+      img = img.resize({ width: size, height: size });
+    }
+    return img;
   } catch (_) {}
   return undefined;
+}
+
+function applyAppIcon() {
+  const icon = iconImage();
+  if (!icon) return;
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(icon);
+  }
+  if (win && !win.isDestroyed()) {
+    win.setIcon(icon);
+  }
 }
 
 function createWindow() {
@@ -49,7 +68,10 @@ function createWindow() {
   });
 
   win.loadURL(appUrl());
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    applyAppIcon();
+    win.show();
+  });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://localhost:3000') || url.startsWith('file://')) {
@@ -69,7 +91,7 @@ function createWindow() {
 
 function buildTray() {
   try {
-    const img = iconImage();
+    const img = iconImage({ tray: true });
     tray = new Tray(img || nativeImage.createEmpty());
   } catch (_) {
     return;
@@ -134,6 +156,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     createWindow();
+    applyAppIcon();
     buildTray();
     menu();
 

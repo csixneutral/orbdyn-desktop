@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
-import { UserPlus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, AlertTriangle, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -24,6 +24,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { showNotification } from '@/lib/notify';
 import { api } from '../api';
 import { useData } from '../context/DataContext';
@@ -69,6 +75,42 @@ function roleBadgeVariant(role) {
 }
 
 const ROLE_COMBO_ITEMS = ROLE_OPTIONS.map((option) => getRoleShortLabel(option.value));
+
+function PeopleActionsMenu({ canDelete, onEdit, onDelete }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <MoreVertical className="h-4 w-4" />
+          <span className="sr-only">Person actions</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            onEdit?.();
+          }}
+        >
+          <Pencil className="h-4 w-4" />
+          Edit
+        </DropdownMenuItem>
+        {canDelete && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={(e) => {
+              e.preventDefault();
+              onDelete?.();
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function PeopleView({ projectId }) {
   const { user } = useAuth();
@@ -196,7 +238,6 @@ export function PeopleView({ projectId }) {
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Joined Date</TableHead>
               {canManagePeople && <TableHead>Actions</TableHead>}
             </TableRow>
           </TableHeader>
@@ -293,26 +334,13 @@ export function PeopleView({ projectId }) {
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>
-                  </TableCell>
                   {canManagePeople && (
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenEdit(u)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {u.id !== user?.id && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleOpenDelete(u)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                      <PeopleActionsMenu
+                        canDelete={u.id !== user?.id}
+                        onEdit={() => handleOpenEdit(u)}
+                        onDelete={() => handleOpenDelete(u)}
+                      />
                     </TableCell>
                   )}
                 </TableRow>

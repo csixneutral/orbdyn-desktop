@@ -10,7 +10,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  publicDir: false,
+  publicDir: 'static',
   build: {
     outDir: 'public',
     emptyOutDir: true,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
-import { Building2, KeyRound, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Building2, KeyRound, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
@@ -12,23 +12,19 @@ import { useAuth } from '../context/AuthContext';
 
 const TOTAL_STEPS = 2;
 
-export function SetupView({ onBack, onSignIn }) {
+export function SetupView({ onSignIn, onHome }) {
   const { setup } = useAuth();
 
   const [step, setStep] = useState(1);
-  const [orgName, setOrgName] = useState('My Team');
+  const [orgName, setOrgName] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      return;
-    }
-    onBack?.();
+  const handlePreviousStep = () => {
+    if (step > 1) setStep(step - 1);
   };
 
   const handleContinue = (e) => {
@@ -71,15 +67,12 @@ export function SetupView({ onBack, onSignIn }) {
 
   return (
     <AuthLayout
-      onBack={handleBack}
+      onSignIn={onSignIn}
+      onHome={onHome}
       step={step}
       totalSteps={TOTAL_STEPS}
       title={step === 1 ? 'About your team' : 'Create your login'}
-      description={
-        step === 1
-          ? 'Start with your team name and your full name.'
-          : 'Choose a username, password, and your sign-in email.'
-      }
+      description={step === 1 ? 'Start with your team name and your full name.' : undefined}
       icon={step === 1 ? Building2 : KeyRound}
       footer={
         onSignIn ? (
@@ -164,9 +157,6 @@ export function SetupView({ onBack, onSignIn }) {
                       autoComplete="email"
                       required
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Used to sign in to Orbdyn (your username is for display inside the app).
-                    </p>
                   </div>
 
                   <div className="flex flex-col gap-2">
@@ -181,20 +171,13 @@ export function SetupView({ onBack, onSignIn }) {
                     />
                   </div>
 
-                  <div className="flex items-start gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      Secured with Supabase Auth. Use a strong password you will remember.
-                    </p>
-                  </div>
-
                   <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                     <Button
                       type="button"
                       variant="outline"
                       size="lg"
                       className="w-full sm:flex-1"
-                      onClick={() => setStep(1)}
+                      onClick={handlePreviousStep}
                       disabled={loading}
                     >
                       <ArrowLeft className="h-4 w-4" />

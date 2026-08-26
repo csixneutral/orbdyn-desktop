@@ -7,6 +7,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { patchElectronIcon } from './patch-electron-icon.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -33,7 +34,10 @@ const startElectron = () => {
   });
 };
 
-setTimeout(startElectron, 2500);
+setTimeout(async () => {
+  await patchElectronIcon();
+  startElectron();
+}, 2500);
 
 vite.on('exit', () => {
   if (electron) electron.kill();

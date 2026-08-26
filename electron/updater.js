@@ -12,6 +12,36 @@ function sendStatus(payload) {
 function setupAutoUpdater(getWindow) {
   mainWindow = getWindow();
 
+  ipcMain.handle('orbdyn:get-app-version', () => app.getVersion());
+
+  ipcMain.handle('orbdyn:check-for-updates', async () => {
+    if (!app.isPackaged) {
+      return { status: 'dev', version: app.getVersion() };
+    }
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      return {
+        status: 'checking',
+        version: result?.updateInfo?.version || null,
+      };
+    } catch (error) {
+      sendStatus({ status: 'error', message: error?.message || 'Update check failed' });
+      throw error;
+    }
+  });
+
+  ipcMain.handle('orbdyn:download-update', async () => {
+    if (!app.isPackaged) return { status: 'dev' };
+    await autoUpdater.downloadUpdate();
+    return { status: 'downloading' };
+  });
+
+  ipcMain.handle('orbdyn:install-update', () => {
+    if (!app.isPackaged) return { status: 'dev' };
+    autoUpdater.quitAndInstall(false, true);
+    return { status: 'installing' };
+  });
+
   if (!app.isPackaged) {
     return;
   }
@@ -59,36 +89,6 @@ function setupAutoUpdater(getWindow) {
       status: 'error',
       message: error?.message || 'Update check failed',
     });
-  });
-
-  ipcMain.handle('orbdyn:get-app-version', () => app.getVersion());
-
-  ipcMain.handle('orbdyn:check-for-updates', async () => {
-    if (!app.isPackaged) {
-      return { status: 'dev', version: app.getVersion() };
-    }
-    try {
-      const result = await autoUpdater.checkForUpdates();
-      return {
-        status: 'checking',
-        version: result?.updateInfo?.version || null,
-      };
-    } catch (error) {
-      sendStatus({ status: 'error', message: error?.message || 'Update check failed' });
-      throw error;
-    }
-  });
-
-  ipcMain.handle('orbdyn:download-update', async () => {
-    if (!app.isPackaged) return { status: 'dev' };
-    await autoUpdater.downloadUpdate();
-    return { status: 'downloading' };
-  });
-
-  ipcMain.handle('orbdyn:install-update', () => {
-    if (!app.isPackaged) return { status: 'dev' };
-    autoUpdater.quitAndInstall(false, true);
-    return { status: 'installing' };
   });
 
   setTimeout(() => {

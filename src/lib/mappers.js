@@ -7,6 +7,7 @@ export function mapProfile(row) {
     email: row.email || '',
     role: row.role,
     color: row.color,
+    avatarUrl: row.avatar_url || '',
     active: row.active,
     createdAt: row.created_at,
     lastSeen: row.last_seen,

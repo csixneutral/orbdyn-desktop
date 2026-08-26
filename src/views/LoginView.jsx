@@ -10,7 +10,7 @@ import { showNotification } from '@/lib/notify';
 import { AuthLayout } from '../components/AuthLayout';
 import { useAuth } from '../context/AuthContext';
 
-export function LoginView({ onBack, onGetStarted }) {
+export function LoginView({ onGetStarted, onSignIn, onHome }) {
   const { login } = useAuth();
 
   const [username, setUsername] = useState('');
@@ -36,7 +36,8 @@ export function LoginView({ onBack, onGetStarted }) {
 
   return (
     <AuthLayout
-      onBack={onBack}
+      onSignIn={onSignIn}
+      onHome={onHome}
       title="Sign in"
       description="Use your username or email and password."
       icon={LogIn}

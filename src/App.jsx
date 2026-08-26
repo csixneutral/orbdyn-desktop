@@ -158,16 +158,17 @@ export function App() {
     if (authScreen === 'setup') {
       return (
         <SetupView
-          onBack={() => setAuthScreen('welcome')}
           onSignIn={() => setAuthScreen('login')}
+          onHome={() => setAuthScreen('welcome')}
         />
       );
     }
     if (authScreen === 'login') {
       return (
         <LoginView
-          onBack={() => setAuthScreen('welcome')}
           onGetStarted={() => setAuthScreen('setup')}
+          onSignIn={() => setAuthScreen('login')}
+          onHome={() => setAuthScreen('welcome')}
         />
       );
     }

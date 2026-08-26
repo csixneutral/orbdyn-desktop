@@ -8,10 +8,11 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
+import { MarketingHeader } from '@/components/MarketingHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TypographyH1, TypographyLarge, TypographyLead, TypographyMuted, TypographySmall } from '@/components/ui/typography';
+import { TypographyH1, TypographyLead, TypographyMuted, TypographySmall } from '@/components/ui/typography';
 
 const features = [
   {
@@ -50,20 +51,7 @@ export function WelcomeView({ onGetStarted, onSignIn }) {
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-6 py-10">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-extrabold text-primary-foreground">
-              O
-            </div>
-            <div>
-              <TypographyLarge>Orbdyn</TypographyLarge>
-              <TypographyMuted className="text-xs">Team workspace</TypographyMuted>
-            </div>
-          </div>
-          <Button variant="outline" onClick={onSignIn}>
-            Sign in
-          </Button>
-        </header>
+        <MarketingHeader onSignIn={onSignIn} />
 
         <main className="my-12 flex flex-1 flex-col items-center justify-center gap-12 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-xl space-y-6 text-center lg:text-left">
