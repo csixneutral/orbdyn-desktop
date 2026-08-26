@@ -56,7 +56,7 @@ import {
   getAllowedTaskStatuses,
   getStatusChangeBlockedMessage,
 } from '@/lib/task-status';
-import { canCreateContent, canChangeTaskAssignees, canProcessTasks } from '@/lib/roles';
+import { canCreateContent, canChangeTaskAssignees, canProcessTasks, canBeAssignedToTask } from '@/lib/roles';
 
 const TASK_STATUSES = TASK_STATUS_COLUMNS;
 
@@ -326,19 +326,9 @@ export function TaskDetailView({ taskId, onBack }) {
       ? [task.assigneeId]
       : [];
 
-  const isAssignableUser = (person) =>
-    person?.active !== false && person?.role !== 'admin' && person?.id !== user?.id;
-
-  const assigneeOptions = (() => {
-    let pool = users.filter(isAssignableUser);
-
-    if (project && project.visibility === 'members') {
-      const allowedIds = new Set([project.ownerId, ...(project.memberIds || [])]);
-      pool = pool.filter((u) => allowedIds.has(u.id));
-    }
-
-    return pool.map((u) => ({ value: u.id, label: u.name }));
-  })();
+  const assigneeOptions = users
+    .filter((u) => canBeAssignedToTask(u, user))
+    .map((u) => ({ value: u.id, label: u.name }));
 
   const visibleAssigneeIds = currentAssigneeIds.filter((id) =>
     assigneeOptions.some((opt) => opt.value === id)

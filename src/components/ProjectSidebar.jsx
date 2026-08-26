@@ -1,11 +1,9 @@
 import React from 'react';
 import {
-  Activity,
   Calendar,
   FileText,
   LayoutDashboard,
   ListChecks,
-  Users,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -40,8 +38,6 @@ const NAV_ITEMS = [
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
-  { id: 'team', label: 'Team', icon: Users },
-  { id: 'activity', label: 'Activity', icon: Activity },
 ];
 
 export function ProjectSidebar({

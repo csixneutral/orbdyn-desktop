@@ -61,6 +61,13 @@ export function canChangeTaskAssignees(user) {
   return canCreateContent(user);
 }
 
+export function canBeAssignedToTask(person, currentUser) {
+  if (!person || person.active === false) return false;
+  if (normalizeRole(person.role) === 'admin') return false;
+  if (person.id === currentUser?.id) return false;
+  return true;
+}
+
 export function isTaskOnlyMember(user) {
   return user?.role === 'member';
 }

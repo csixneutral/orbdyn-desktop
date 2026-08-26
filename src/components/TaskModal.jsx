@@ -50,6 +50,7 @@ import {
   getAllowedTaskStatuses,
   getStatusChangeBlockedMessage,
 } from '@/lib/task-status';
+import { canBeAssignedToTask } from '@/lib/roles';
 
 const STATUS_OPTIONS = TASK_STATUS_COLUMNS.map((col) => ({
   label: col.title,
@@ -259,17 +260,9 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
     }
   };
 
-  const assigneeOptions = (() => {
-    const selProj = projects.find((p) => p.id === projectId);
-    let pool = users.filter((u) => u.active !== false && u.id !== user?.id);
-
-    if (selProj && selProj.visibility === 'members') {
-      const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
-      pool = pool.filter((u) => allowedIds.has(u.id));
-    }
-
-    return pool.map((u) => ({ value: u.id, label: u.name }));
-  })();
+  const assigneeOptions = users
+    .filter((u) => canBeAssignedToTask(u, user))
+    .map((u) => ({ value: u.id, label: u.name }));
 
   const selectedProject = projects.find((p) => p.id === projectId);
   const statusOptions = taskId
@@ -294,7 +287,7 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
               <DialogDescription>
                 {taskId
                   ? 'Update details, track progress & discuss'
-                  : 'Create a new task and award to team members'}
+                  : 'Create a new task and assign it to anyone in your organization'}
               </DialogDescription>
             </div>
           </div>
@@ -337,13 +330,7 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
                 <Select
                   value={projectId || '__none__'}
                   onValueChange={(val) => {
-                    const nextId = val === '__none__' ? null : val;
-                    setProjectId(nextId);
-                    const selProj = projects.find((p) => p.id === nextId);
-                    if (selProj && selProj.visibility === 'members') {
-                      const allowedIds = new Set([selProj.ownerId, ...(selProj.memberIds || [])]);
-                      setAssigneeIds((prev) => prev.filter((id) => allowedIds.has(id)));
-                    }
+                    setProjectId(val === '__none__' ? null : val);
                   }}
                 >
                   <SelectTrigger>
@@ -382,7 +369,7 @@ export function TaskModal({ taskId, opened, onClose, defaultProjectId }) {
                       </Button>
                     ) : (
                       <p className="mt-2 text-xs text-muted-foreground">
-                        Ask an administrator to add team members.
+                        Add people in People & Roles to assign tasks.
                       </p>
                     )}
                   </div>

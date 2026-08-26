@@ -16,7 +16,6 @@ import { TasksView } from './views/TasksView';
 import { DocumentsView } from './views/DocumentsView';
 import { CalendarView } from './views/CalendarView';
 import { PeopleView } from './views/PeopleView';
-import { ActivityView } from './views/ActivityView';
 import { SettingsView } from './views/SettingsView';
 import { ProfileView } from './views/ProfileView';
 import { RecycleBinView } from './views/RecycleBinView';
@@ -47,7 +46,7 @@ function mapNotificationLink(link, tasks) {
     case 'calendar':
       return { tab: 'calendar', taskId: null };
     case 'activity':
-      return { tab: 'activity', taskId: null };
+      return { tab: 'overview', taskId: null };
     default:
       return { tab: 'overview', taskId: null };
   }
@@ -198,10 +197,6 @@ export function App() {
           return <DocumentsView projectId={activeProjectId} />;
         case 'calendar':
           return <CalendarView projectId={activeProjectId} />;
-        case 'team':
-          return <PeopleView projectId={activeProjectId} />;
-        case 'activity':
-          return <ActivityView projectId={activeProjectId} />;
         default:
           return <ProjectOverviewView projectId={activeProjectId} onNavigate={setProjectView} />;
       }

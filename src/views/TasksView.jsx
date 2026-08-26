@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   GripVertical,
   X,
+  MoreVertical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -41,6 +42,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
   TooltipContent,
@@ -86,6 +93,51 @@ function formatEstimateHours(hours) {
   const value = Number(hours) || 0;
   if (value <= 0) return '-';
   return value === 1 ? '1 hr' : `${value} hrs`;
+}
+
+function TaskActionsMenu({ canEdit, canDelete, onEdit, onDelete }) {
+  if (!canEdit && !canDelete) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="h-4 w-4" />
+          <span className="sr-only">Task actions</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        {canEdit && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              onEdit?.();
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </DropdownMenuItem>
+        )}
+        {canDelete && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={(e) => {
+              e.preventDefault();
+              onDelete?.();
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function TasksView({ initialTaskId, projectId }) {
@@ -251,13 +303,13 @@ export function TasksView({ initialTaskId, projectId }) {
   const handleOpenCreate = () => setCreateModalOpened(true);
 
   const handleOpenEdit = (e, id) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     setEditTaskId(id);
     setEditModalOpened(true);
   };
 
   const handleOpenDelete = (e, t) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     setTaskToDelete(t);
     setDeleteModalOpened(true);
   };
@@ -653,30 +705,16 @@ export function TasksView({ initialTaskId, projectId }) {
                                 <ComboboxInput
                                   placeholder="Select status"
                                   loading={updatingStatusTaskId === t.id}
-                                  className={cn(
-                                    'h-8 w-[160px] border-transparent text-white hover:opacity-90',
-                                    getColorClasses(statusCol?.color || 'gray', 'badge')
-                                  )}
+                                  className="h-8 w-[160px] font-normal"
                                 />
                                 <ComboboxContent>
                                   <ComboboxEmpty>No status found.</ComboboxEmpty>
                                   <ComboboxList>
-                                    {(item) => {
-                                      const col = COLUMNS.find((c) => c.title === item);
-                                      return (
-                                        <ComboboxItem key={item} value={item}>
-                                          <span className="flex items-center gap-2">
-                                            <span
-                                              className={cn(
-                                                'h-2 w-2 rounded-full',
-                                                getColorClasses(col?.color || 'gray', 'progress')
-                                              )}
-                                            />
-                                            {item}
-                                          </span>
-                                        </ComboboxItem>
-                                      );
-                                    }}
+                                    {(item) => (
+                                      <ComboboxItem key={item} value={item}>
+                                        {item}
+                                      </ComboboxItem>
+                                    )}
                                   </ComboboxList>
                                 </ComboboxContent>
                               </Combobox>
@@ -716,23 +754,12 @@ export function TasksView({ initialTaskId, projectId }) {
                             )}
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              {canEditTaskDetails(user, t) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => handleOpenEdit(e, t.id)}>
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {(user?.role === 'admin' || t.createdBy === user?.id) && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-destructive hover:text-destructive"
-                                  onClick={(e) => handleOpenDelete(e, t)}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
+                            <TaskActionsMenu
+                              canEdit={canEditTaskDetails(user, t)}
+                              canDelete={user?.role === 'admin' || t.createdBy === user?.id}
+                              onEdit={() => handleOpenEdit(null, t.id)}
+                              onDelete={() => handleOpenDelete(null, t)}
+                            />
                           </TableCell>
                         </TableRow>
                       );
