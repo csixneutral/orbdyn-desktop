@@ -15,11 +15,26 @@ let win = null;
 let tray = null;
 let quitting = false;
 
+function devServerUrl() {
+  const port = process.env.ORBDYN_DEV_PORT || '3000';
+  return `http://127.0.0.1:${port}`;
+}
+
+function productionIndexPath() {
+  return path.join(__dirname, '..', 'public', 'index.html');
+}
+
+function useDevServer() {
+  return !app.isPackaged && process.env.ORBDYN_DEV === '1';
+}
+
 function appUrl() {
-  // npm start builds the UI first (prestart) and loads the packaged files here.
-  // Set ORBDYN_DEV=1 with `npm run dev` if you want Vite hot reload on :3000.
-  if (process.env.ORBDYN_DEV === '1') return 'http://localhost:3000';
-  return `file://${path.join(__dirname, '..', 'public', 'index.html').replace(/\\/g, '/')}`;
+  if (useDevServer()) return devServerUrl();
+  return `file://${productionIndexPath().replace(/\\/g, '/')}`;
+}
+
+function isDevServerUrl(url) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url || '');
 }
 
 function iconPath() {
@@ -67,17 +82,37 @@ function createWindow() {
     },
   });
 
-  win.loadURL(appUrl());
+  const url = appUrl();
+  if (useDevServer()) {
+    win.loadURL(url);
+  } else {
+    win.loadFile(productionIndexPath());
+  }
+
   win.once('ready-to-show', () => {
     applyAppIcon();
     win.show();
   });
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://localhost:3000') || url.startsWith('file://')) {
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, failedUrl) => {
+    if (errorCode === -3) return;
+    console.error('[orbdyn] Failed to load UI:', errorCode, errorDescription, failedUrl || url);
+    if (useDevServer()) {
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.loadURL(failedUrl || url);
+      }, 1000);
+      return;
+    }
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.loadFile(productionIndexPath());
+    }, 1000);
+  });
+
+  win.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
+    if (isDevServerUrl(targetUrl) || targetUrl.startsWith('file://')) {
       return { action: 'allow' };
     }
-    shell.openExternal(url);
+    shell.openExternal(targetUrl);
     return { action: 'deny' };
   });
 

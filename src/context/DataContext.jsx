@@ -147,6 +147,23 @@ export function DataProvider({ children }) {
   );
 }
 
+const EMPTY_DATA = {
+  projects: [],
+  tasks: [],
+  users: [],
+  files: [],
+  events: [],
+  activity: [],
+  trash: [],
+  notificationList: [],
+  unreadNotifications: 0,
+  dashboardData: null,
+  shareStatus: { online: true, url: null, lan: [], port: null, cloud: true },
+  loading: false,
+  refresh: async () => {},
+  setShareStatus: () => {},
+};
+
 export function useData() {
-  return useContext(DataContext);
+  return useContext(DataContext) || EMPTY_DATA;
 }
