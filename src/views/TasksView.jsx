@@ -100,6 +100,31 @@ function getTaskAssignees(task, users) {
   return ids.map((id) => users.find((u) => u.id === id)).filter(Boolean);
 }
 
+function TaskAssigneeAvatars({ assignees, emptyLabel = 'Unassigned' }) {
+  if (!assignees.length) {
+    return emptyLabel ? <span className="text-sm text-muted-foreground">{emptyLabel}</span> : null;
+  }
+
+  return (
+    <div className="flex -space-x-2">
+      {assignees.map((assignee) => (
+        <Tooltip key={assignee.id}>
+          <TooltipTrigger asChild>
+            <Avatar className="h-6 w-6 border-2 border-background">
+              <AvatarFallback
+                className={cn('text-xs', getColorClasses(assignee.color || 'blue', 'avatar'))}
+              >
+                {assignee.name[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </TooltipTrigger>
+          <TooltipContent>Assigned to {assignee.name}</TooltipContent>
+        </Tooltip>
+      ))}
+    </div>
+  );
+}
+
 function TaskActionsMenu({ canEdit, canDelete, onEdit, onDelete }) {
   if (!canEdit && !canDelete) return null;
 
@@ -615,29 +640,7 @@ export function TasksView({ initialTaskId, projectId }) {
                                   />
 
                                   <div className="flex items-center justify-between pt-1">
-                                    {assignees.length > 0 ? (
-                                      <div className="flex -space-x-2">
-                                        {assignees.map((assignee) => (
-                                          <Tooltip key={assignee.id}>
-                                            <TooltipTrigger asChild>
-                                              <Avatar className="h-6 w-6 border-2 border-background">
-                                                <AvatarFallback
-                                                  className={cn(
-                                                    'text-xs',
-                                                    getColorClasses(assignee.color || 'blue', 'avatar')
-                                                  )}
-                                                >
-                                                  {assignee.name[0].toUpperCase()}
-                                                </AvatarFallback>
-                                              </Avatar>
-                                            </TooltipTrigger>
-                                            <TooltipContent>Assigned to {assignee.name}</TooltipContent>
-                                          </Tooltip>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div />
-                                    )}
+                                    <TaskAssigneeAvatars assignees={assignees} emptyLabel={null} />
                                     {task.dueDate && (
                                       <span
                                         className={cn(
@@ -703,7 +706,7 @@ export function TasksView({ initialTaskId, projectId }) {
                             <span className="text-sm font-semibold">{t.title}</span>
                           </TableCell>
                           <TableCell>
-                            {assignees.length > 0 ? assignees.map((assignee) => assignee.name).join(', ') : 'Unassigned'}
+                            <TaskAssigneeAvatars assignees={assignees} />
                           </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {canEditStatus ? (
