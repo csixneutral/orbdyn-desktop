@@ -95,6 +95,11 @@ function formatEstimateHours(hours) {
   return value === 1 ? '1 hr' : `${value} hrs`;
 }
 
+function getTaskAssignees(task, users) {
+  const ids = task.assigneeIds?.length ? task.assigneeIds : task.assigneeId ? [task.assigneeId] : [];
+  return ids.map((id) => users.find((u) => u.id === id)).filter(Boolean);
+}
+
 function TaskActionsMenu({ canEdit, canDelete, onEdit, onDelete }) {
   if (!canEdit && !canDelete) return null;
 
@@ -522,7 +527,7 @@ export function TasksView({ initialTaskId, projectId }) {
                           <p className="py-8 text-center text-xs italic text-muted-foreground">Drop tasks here</p>
                         ) : (
                           colTasks.map((task) => {
-                            const assignee = users.find((u) => u.id === task.assigneeId);
+                            const assignees = getTaskAssignees(task, users);
                             const isDraggingThis = draggedTaskId === task.id;
                             const isDragOverThis = dragOverTaskId === task.id;
 
@@ -610,19 +615,26 @@ export function TasksView({ initialTaskId, projectId }) {
                                   />
 
                                   <div className="flex items-center justify-between pt-1">
-                                    {assignee ? (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Avatar className="h-6 w-6">
-                                            <AvatarFallback
-                                              className={cn('text-xs', getColorClasses(assignee.color || 'blue', 'avatar'))}
-                                            >
-                                              {assignee.name[0].toUpperCase()}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Assigned to {assignee.name}</TooltipContent>
-                                      </Tooltip>
+                                    {assignees.length > 0 ? (
+                                      <div className="flex -space-x-2">
+                                        {assignees.map((assignee) => (
+                                          <Tooltip key={assignee.id}>
+                                            <TooltipTrigger asChild>
+                                              <Avatar className="h-6 w-6 border-2 border-background">
+                                                <AvatarFallback
+                                                  className={cn(
+                                                    'text-xs',
+                                                    getColorClasses(assignee.color || 'blue', 'avatar')
+                                                  )}
+                                                >
+                                                  {assignee.name[0].toUpperCase()}
+                                                </AvatarFallback>
+                                              </Avatar>
+                                            </TooltipTrigger>
+                                            <TooltipContent>Assigned to {assignee.name}</TooltipContent>
+                                          </Tooltip>
+                                        ))}
+                                      </div>
                                     ) : (
                                       <div />
                                     )}
@@ -675,7 +687,7 @@ export function TasksView({ initialTaskId, projectId }) {
                     </TableRow>
                   ) : (
                     filteredTasks.map((t) => {
-                      const assignee = users.find((u) => u.id === t.assigneeId);
+                      const assignees = getTaskAssignees(t, users);
                       const statusCol = COLUMNS.find((c) => c.id === t.status);
                       const project = projects.find((p) => p.id === t.projectId);
                       const allowedStatuses = getAllowedTaskStatuses({ user, task: t, project });
@@ -690,7 +702,9 @@ export function TasksView({ initialTaskId, projectId }) {
                           <TableCell>
                             <span className="text-sm font-semibold">{t.title}</span>
                           </TableCell>
-                          <TableCell>{assignee ? assignee.name : 'Unassigned'}</TableCell>
+                          <TableCell>
+                            {assignees.length > 0 ? assignees.map((assignee) => assignee.name).join(', ') : 'Unassigned'}
+                          </TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             {canEditStatus ? (
                               <Combobox
