@@ -28,6 +28,18 @@ const TASK_STATUSES = ['todo', 'in_progress', 'review', 'done', 'blocked'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const PROFILE_COLORS = ['#3d7fe0', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
+function edgeFunctionUnavailable(fnError) {
+  const message = fnError?.message || '';
+  return /Function not found|404|Failed to send a request to the Edge Function|non-2xx|502|503|504|Failed to fetch|NetworkError|fetch failed/i.test(
+    message
+  );
+}
+
+function edgeFunctionResponseError(data, fallback = 'Request failed') {
+  if (typeof data?.error === 'string' && data.error.trim()) return data.error;
+  return fallback;
+}
+
 function throwOnError(error, fallback = 'Request failed') {
   if (error) throw new Error(error.message || fallback);
 }
@@ -792,10 +804,12 @@ export const api = {
       throw new Error(fnData.error || 'Account already exists. Try Sign in instead.');
     }
 
-    if (fnError && !/Function not found|404|Failed to send a request to the Edge Function|403|privileges/i.test(fnError.message || '')) {
-      if (fnData?.error) throw formatAuthError({ message: fnData.error }, 'Setup failed');
-      throw formatAuthError(fnError, 'Setup failed');
+    if (edgeFunctionUnavailable(fnError)) {
+      return legacyClientSetup({ ...body, contactEmail });
     }
+
+    if (fnData?.error) throw formatAuthError({ message: fnData.error }, 'Setup failed');
+    if (fnError) throw formatAuthError(fnError, 'Setup failed');
 
     return legacyClientSetup({ ...body, contactEmail });
   },
@@ -923,14 +937,16 @@ export const api = {
 
     const { data, error: fnError } = await supabase.functions.invoke('create-user', { body });
 
-    if (!fnError && data && !data.error) {
+    if (!fnError && data?.user && !data?.error) {
       return { user: data.user };
     }
 
-    if (fnError && !/Function not found|404|Failed to send a request to the Edge Function|403|privileges/i.test(fnError.message || '')) {
-      if (data?.error) throw new Error(data.error);
-      throw formatAuthError(fnError, 'Could not create user.');
+    if (edgeFunctionUnavailable(fnError)) {
+      return legacyCreateUser(body);
     }
+
+    if (data?.error) throw new Error(data.error);
+    if (fnError) throw new Error(edgeFunctionResponseError(data, fnError.message || 'Could not create user.'));
 
     return legacyCreateUser(body);
   },
