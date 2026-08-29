@@ -121,6 +121,9 @@ export function DocumentsView({ projectId }) {
     }
   };
 
+  const isProjectScoped = Boolean(projectId);
+  const tableColumnCount = isProjectScoped ? 4 : 6;
+
   const filteredFiles = files.filter((f) => {
     if (filterProject && f.projectId !== filterProject) return false;
     return true;
@@ -204,8 +207,8 @@ export function DocumentsView({ projectId }) {
           <TableHeader>
             <TableRow>
               <TableHead>Document Name</TableHead>
-              <TableHead>Project</TableHead>
-              <TableHead>Size</TableHead>
+              {!isProjectScoped && <TableHead>Project</TableHead>}
+              {!isProjectScoped && <TableHead>Size</TableHead>}
               <TableHead>Uploaded By</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Actions</TableHead>
@@ -214,7 +217,7 @@ export function DocumentsView({ projectId }) {
           <TableBody>
             {filteredFiles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={tableColumnCount} className="py-12 text-center text-muted-foreground">
                   No documents uploaded yet.
                 </TableCell>
               </TableRow>
@@ -232,22 +235,26 @@ export function DocumentsView({ projectId }) {
                         <span className="text-sm font-semibold">{f.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {project ? (
-                        <Badge
-                          variant="outline"
-                          className="text-xs"
-                          style={{ borderColor: project.colour, color: project.colour }}
-                        >
-                          {project.name}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">General</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs">{formatBytes(f.size)}</span>
-                    </TableCell>
+                    {!isProjectScoped && (
+                      <TableCell>
+                        {project ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs"
+                            style={{ borderColor: project.colour, color: project.colour }}
+                          >
+                            {project.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">General</span>
+                        )}
+                      </TableCell>
+                    )}
+                    {!isProjectScoped && (
+                      <TableCell>
+                        <span className="text-xs">{formatBytes(f.size)}</span>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <span className="text-xs">{uploader ? uploader.name : 'Unknown'}</span>
                     </TableCell>
@@ -304,6 +311,7 @@ export function DocumentsView({ projectId }) {
             <DialogTitle>Upload Documents</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUploadSubmit} className="space-y-4">
+            {!isProjectScoped && (
             <div className="space-y-2">
               <Label>Associated Project (Optional)</Label>
               <Select
@@ -323,6 +331,7 @@ export function DocumentsView({ projectId }) {
                 </SelectContent>
               </Select>
             </div>
+            )}
 
             <div className="space-y-2">
               <Label>Choose files</Label>
