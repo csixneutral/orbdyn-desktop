@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { PageHeader } from '@/components/ui/typography';
 import { canCreateContent } from '@/lib/roles';
+import { getPersonDisplayNameById } from '@/lib/people';
 import { showNotification } from '@/lib/notify';
 import { downloadFile, loadFilePreviewUrl } from '@/lib/files';
 import { useData } from '../context/DataContext';
@@ -168,12 +169,12 @@ export function DocumentsView({ projectId }) {
   };
 
   const getUploaderDisplayName = (file) => {
+    const fromUser = getPersonDisplayNameById(file.uploadedBy, users);
+    if (fromUser) return fromUser;
+
     const fromFile = file.uploadedByName?.trim();
     if (fromFile) return fromFile;
 
-    const person = users.find((u) => u.id === file.uploadedBy);
-    if (person?.name?.trim()) return person.name.trim();
-    if (person?.username?.trim()) return person.username.trim();
     return 'Unknown';
   };
 

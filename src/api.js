@@ -23,6 +23,7 @@ import {
   mapTrash,
 } from '@/lib/mappers.js';
 import { normalizeRole } from '@/lib/roles';
+import { getPersonDisplayName } from '@/lib/people';
 
 const TASK_STATUSES = ['todo', 'in_progress', 'review', 'done', 'blocked'];
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'];
@@ -1555,14 +1556,35 @@ export const api = {
     const { mapped: projects } = await fetchProjectsMap(row.workspace_id);
     const allowed = new Set(visibleProjects(profile, projects).map((p) => p.id));
 
-    const { data, error } = await supabase
-      .from('files')
-      .select('*, uploader:profiles!uploaded_by(name, username)')
-      .eq('workspace_id', row.workspace_id)
-      .order('created_at', { ascending: false });
+    const [{ data, error }, peopleRes] = await Promise.all([
+      supabase
+        .from('files')
+        .select('*, uploader:profiles!files_uploaded_by_fkey(name, username, role)')
+        .eq('workspace_id', row.workspace_id)
+        .order('created_at', { ascending: false }),
+      supabase.rpc('list_workspace_people'),
+    ]);
     throwOnError(error);
 
-    let files = (data || []).map(mapFile).filter((f) => !f.projectId || allowed.has(f.projectId));
+    const peopleById = new Map(
+      (peopleRes.data || [])
+        .map((personRow) => mapProfile(personRow))
+        .filter(Boolean)
+        .map((person) => [person.id, person])
+    );
+
+    let files = (data || [])
+      .map((fileRow) => {
+        const file = mapFile(fileRow);
+        const person = peopleById.get(file.uploadedBy);
+        if (person) {
+          file.uploadedByName = getPersonDisplayName(person);
+        } else if (fileRow.uploader) {
+          file.uploadedByName = getPersonDisplayName(mapProfile(fileRow.uploader));
+        }
+        return file;
+      })
+      .filter((f) => !f.projectId || allowed.has(f.projectId));
 
     const { projectId, taskId } = params;
     if (projectId) files = files.filter((f) => f.projectId === projectId);
