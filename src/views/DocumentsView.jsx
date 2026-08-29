@@ -167,6 +167,16 @@ export function DocumentsView({ projectId }) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
+  const getUploaderDisplayName = (file) => {
+    const fromFile = file.uploadedByName?.trim();
+    if (fromFile) return fromFile;
+
+    const person = users.find((u) => u.id === file.uploadedBy);
+    if (person?.name?.trim()) return person.name.trim();
+    if (person?.username?.trim()) return person.username.trim();
+    return 'Unknown';
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -224,7 +234,7 @@ export function DocumentsView({ projectId }) {
             ) : (
               filteredFiles.map((f) => {
                 const project = projects.find((p) => p.id === f.projectId);
-                const uploader = users.find((u) => u.id === f.uploadedBy);
+                const uploaderName = getUploaderDisplayName(f);
                 const isMedia = f.mime && (f.mime.startsWith('image/') || f.mime === 'application/pdf');
 
                 return (
@@ -256,7 +266,7 @@ export function DocumentsView({ projectId }) {
                       </TableCell>
                     )}
                     <TableCell>
-                      <span className="text-xs">{uploader ? uploader.name : 'Unknown'}</span>
+                      <span className="text-xs">{uploaderName}</span>
                     </TableCell>
                     <TableCell>
                       <span className="text-xs">{new Date(f.createdAt).toLocaleDateString()}</span>

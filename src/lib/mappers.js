@@ -74,6 +74,7 @@ export function mapComment(row) {
 
 export function mapFile(row) {
   if (!row) return null;
+  const uploader = row.uploader || null;
   return {
     id: row.id,
     name: row.name,
@@ -85,6 +86,7 @@ export function mapFile(row) {
     taskId: row.task_id,
     note: row.note || '',
     uploadedBy: row.uploaded_by,
+    uploadedByName: uploader?.name || row.uploaded_by_name || '',
     downloads: row.downloads || 0,
     createdAt: row.created_at,
   };

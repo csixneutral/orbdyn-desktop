@@ -1557,7 +1557,7 @@ export const api = {
 
     const { data, error } = await supabase
       .from('files')
-      .select('*')
+      .select('*, uploader:profiles!uploaded_by(name, username)')
       .eq('workspace_id', row.workspace_id)
       .order('created_at', { ascending: false });
     throwOnError(error);
